@@ -1,0 +1,23 @@
+{
+  "version": "0.1.0",
+  "purpose": "synthetic_education_only",
+  "variables": {
+    "demographics": ["sex", "age", "residence", "occupation"],
+    "history": ["chief_complaint", "history_of_present_illness", "past_medical_history", "surgical_history", "hospitalization_history"],
+    "medications": ["name", "dose", "route", "frequency", "adherence", "start_date", "stop_date"],
+    "allergies": ["agent", "reaction", "severity", "status"],
+    "family_history": ["condition", "relative", "age_of_onset"],
+    "social_history": ["smoking", "alcohol", "occupation_exposure", "living_arrangement", "caregiver_support"],
+    "observations": ["name", "value", "unit", "date", "method", "reference_range"],
+    "tests": ["type", "result", "interpretation", "date"],
+    "interventions": ["type", "agent", "dose", "response", "date"],
+    "disposition": ["status", "destination", "follow_up", "return_precautions"]
+  },
+  "invariants": [
+    "synthetic must be true",
+    "timeline dates are non-decreasing",
+    "future knowledge cannot appear in an earlier encounter",
+    "every projected document field has source lineage",
+    "unknown values are represented explicitly rather than invented"
+  ]
+}

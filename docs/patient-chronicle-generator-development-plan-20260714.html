@@ -1,0 +1,1592 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Patient Chronicle 기반 환자 히스토리·초진기록지·구급활동일지·NEDIS 생성기의 전체 개발 계획, 데이터 스키마, 알고리즘 상세 설계">
+  <title>Patient Chronicle Generator — 전체 개발 계획 · 데이터 스키마 · 알고리즘</title>
+  <style>
+    :root {
+      --ink: #17312c;
+      --ink-soft: #3f5650;
+      --paper: #f7f2e8;
+      --paper-2: #fffdf8;
+      --line: #c8d1c9;
+      --line-strong: #7b9187;
+      --accent: #b94f37;
+      --accent-soft: #f3d7cb;
+      --green: #1f6657;
+      --green-soft: #dcece6;
+      --gold: #a87320;
+      --warning: #7b391e;
+      --code: #102c28;
+      --shadow: 0 18px 60px rgba(28, 58, 50, .10);
+      --serif: "Noto Serif KR", "KoPub Batang", "Batang", serif;
+      --sans: "Pretendard Variable", "Pretendard", "Noto Sans KR", sans-serif;
+      --mono: "D2Coding", "JetBrains Mono", "SFMono-Regular", monospace;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 0%, rgba(185,79,55,.12), transparent 32rem),
+        linear-gradient(135deg, #e8efe8 0%, var(--paper) 34%, #f4e9dc 100%);
+      font-family: var(--sans);
+      line-height: 1.72;
+      word-break: keep-all;
+    }
+    a { color: var(--green); text-underline-offset: .18em; }
+    a:hover { color: var(--accent); }
+    .layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); min-height: 100vh; }
+    .toc {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 30px 22px 24px;
+      overflow-y: auto;
+      background: rgba(16,44,40,.96);
+      color: #f8f3e9;
+      border-right: 1px solid rgba(255,255,255,.14);
+    }
+    .toc .brand { font-family: var(--serif); font-size: 1.35rem; line-height: 1.25; letter-spacing: -.025em; }
+    .toc .version { margin: 8px 0 24px; color: #b9cdc6; font-size: .78rem; }
+    .toc nav { display: grid; gap: 2px; }
+    .toc nav a { padding: 6px 8px; color: #dce7e2; text-decoration: none; font-size: .82rem; border-left: 2px solid transparent; }
+    .toc nav a:hover { color: white; border-left-color: #ef9c7f; background: rgba(255,255,255,.06); }
+    .toc .actions { margin-top: 24px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.16); }
+    button {
+      width: 100%; padding: 10px 12px; border: 1px solid rgba(255,255,255,.38); border-radius: 3px;
+      color: #fff; background: transparent; font: inherit; cursor: pointer;
+    }
+    button:hover { background: rgba(255,255,255,.1); }
+    main { width: min(1120px, calc(100vw - 320px)); margin: 0 auto; padding: 42px 44px 100px; }
+    .cover {
+      min-height: 78vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: clamp(40px, 8vw, 96px);
+      color: #fffaf0;
+      background:
+        linear-gradient(115deg, rgba(13,54,46,.94), rgba(28,79,64,.82)),
+        repeating-linear-gradient(45deg, transparent 0 22px, rgba(255,255,255,.035) 22px 23px);
+      box-shadow: var(--shadow);
+      border-bottom: 8px solid var(--accent);
+    }
+    .eyebrow { color: #f1b49e; font-size: .78rem; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; }
+    h1, h2, h3, h4 { font-family: var(--serif); letter-spacing: -.035em; }
+    h1 { max-width: 900px; margin: 16px 0 18px; font-size: clamp(2.7rem, 6vw, 5.8rem); line-height: 1.02; font-weight: 700; }
+    .cover .lead { max-width: 760px; margin: 0; color: #dfeae5; font-size: clamp(1rem, 1.8vw, 1.25rem); }
+    .cover-meta { display: flex; flex-wrap: wrap; gap: 14px 26px; margin-top: 44px; color: #b9d0c8; font-size: .84rem; }
+    section { scroll-margin-top: 28px; margin-top: 76px; }
+    h2 { margin: 0 0 22px; padding-bottom: 12px; font-size: clamp(1.9rem, 3vw, 2.7rem); line-height: 1.2; border-bottom: 2px solid var(--ink); }
+    h3 { margin: 36px 0 12px; font-size: 1.4rem; }
+    h4 { margin: 24px 0 8px; font-size: 1.08rem; }
+    p { max-width: 88ch; }
+    .lede { max-width: 80ch; font-size: 1.08rem; color: var(--ink-soft); }
+    .callout { margin: 26px 0; padding: 20px 24px; background: var(--green-soft); border-left: 5px solid var(--green); }
+    .callout.warn { color: var(--warning); background: #f7e4d6; border-left-color: var(--accent); }
+    .callout strong { color: var(--ink); }
+    .grid-2, .grid-3 { display: grid; gap: 18px; }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .panel { padding: 20px 22px; background: rgba(255,253,248,.78); border-top: 3px solid var(--line-strong); }
+    .panel h3, .panel h4 { margin-top: 0; }
+    ul, ol { padding-left: 1.3rem; }
+    li + li { margin-top: .35rem; }
+    .dense li + li { margin-top: .12rem; }
+    .flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin: 24px 0; }
+    .flow .step { flex: 1 1 135px; min-width: 120px; padding: 14px 12px; background: var(--paper-2); border: 1px solid var(--line); text-align: center; font-size: .85rem; }
+    .flow .arrow { align-self: center; color: var(--accent); font-weight: 800; }
+    .table-wrap { margin: 18px 0 30px; overflow-x: auto; border: 1px solid var(--line); background: var(--paper-2); }
+    table { width: 100%; border-collapse: collapse; font-size: .82rem; line-height: 1.48; }
+    caption { padding: 12px 14px; text-align: left; font-weight: 800; color: var(--ink); background: var(--green-soft); }
+    th, td { padding: 10px 12px; vertical-align: top; border-bottom: 1px solid #dde2dc; text-align: left; }
+    th { position: sticky; top: 0; color: #fff; background: #214e44; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code, pre { font-family: var(--mono); }
+    code { padding: .1em .28em; color: #8d301e; background: #f0e5d8; border-radius: 2px; }
+    pre { margin: 18px 0 28px; padding: 20px 22px; overflow-x: auto; color: #e8f3ee; background: var(--code); border-left: 5px solid #e37b59; font-size: .79rem; line-height: 1.55; }
+    pre code { padding: 0; color: inherit; background: transparent; }
+    .tag { display: inline-block; margin: 2px 4px 2px 0; padding: 2px 7px; border: 1px solid var(--line-strong); border-radius: 999px; font-size: .7rem; white-space: nowrap; }
+    .status { font-weight: 800; }
+    .status.must { color: #92321f; }
+    .status.should { color: #2a6557; }
+    .status.later { color: #776127; }
+    .diagram { margin: 28px 0; padding: 20px; overflow-x: auto; background: rgba(255,253,248,.7); border: 1px solid var(--line); }
+    .diagram svg { display: block; min-width: 860px; width: 100%; height: auto; }
+    .small { font-size: .78rem; color: var(--ink-soft); }
+    .source-list li { margin-bottom: .6rem; }
+    .checklist { list-style: none; padding-left: 0; }
+    .checklist li { position: relative; padding-left: 1.8rem; }
+    .checklist li::before { content: "□"; position: absolute; left: 0; color: var(--green); font-weight: 800; }
+    .page-footer { margin-top: 90px; padding-top: 24px; border-top: 2px solid var(--ink); color: var(--ink-soft); font-size: .8rem; }
+    @media (max-width: 980px) {
+      .layout { display: block; }
+      .toc { position: relative; height: auto; padding: 20px; }
+      .toc nav {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        max-height: 176px;
+        overflow-y: auto;
+        padding: 8px 0;
+        border-top: 1px solid rgba(255,255,255,.14);
+        border-bottom: 1px solid rgba(255,255,255,.14);
+      }
+      .toc .version { margin-bottom: 12px; }
+      .toc .actions { margin-top: 12px; padding-top: 0; border-top: 0; }
+      main { width: 100%; padding: 24px 18px 70px; }
+      .cover { min-height: 66vh; padding: 36px 24px; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      .toc { padding: 16px 18px; }
+      .toc nav { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 148px; }
+      .toc nav a { padding: 5px 6px; font-size: .72rem; }
+      .toc .actions { display: none; }
+      h1 { font-size: 2.5rem; }
+      th, td { min-width: 150px; }
+    }
+    @media print {
+      body { background: white; font-size: 10pt; }
+      .layout { display: block; }
+      .toc { display: none; }
+      main { width: auto; max-width: none; padding: 0; }
+      .cover { min-height: 250mm; box-shadow: none; break-after: page; }
+      section { margin-top: 28px; break-before: page; }
+      h3, h4 { break-after: avoid; }
+      .panel, .callout, pre, .table-wrap { break-inside: avoid; }
+      th { position: static; }
+      a { color: inherit; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="toc" aria-label="문서 목차">
+      <div class="brand">Patient Chronicle<br>Generator</div>
+      <div class="version">통합 설계서 v1.0 · 2026-07-14</div>
+      <nav>
+        <a href="#summary">01. 실행 요약</a>
+        <a href="#evidence">02. 조사 자료와 교훈</a>
+        <a href="#scope">03. 범위와 성공 기준</a>
+        <a href="#principles">04. 설계 원칙</a>
+        <a href="#ontology">05. 온톨로지·토폴로지</a>
+        <a href="#architecture">06. 시스템 아키텍처</a>
+        <a href="#pipeline">07. 생성 파이프라인</a>
+        <a href="#schema">08. 데이터 스키마</a>
+        <a href="#variables">09. 변수 카탈로그</a>
+        <a href="#relations">10. 관계·기준값 모델</a>
+        <a href="#unknown">11. Unknown 모델</a>
+        <a href="#algorithms">12. 알고리즘 상세</a>
+        <a href="#llm">13. LLM 오케스트레이션</a>
+        <a href="#documents">14. 문서 투영</a>
+        <a href="#validation">15. 검증·품질·프라이버시</a>
+        <a href="#api">16. API·운영 설계</a>
+        <a href="#roadmap">17. 개발 로드맵</a>
+        <a href="#testing">18. 테스트·완료 게이트</a>
+        <a href="#risks">19. 위험·결정 과제</a>
+        <a href="#appendix">20. 부록·참고문헌</a>
+      </nav>
+      <div class="actions"><button type="button" onclick="window.print()">인쇄 / PDF 저장</button></div>
+    </aside>
+
+    <main>
+      <header class="cover">
+        <div class="eyebrow">Architecture · Schema · Algorithms · Delivery Plan</div>
+        <h1>환자 한 명의 삶에서<br>100명의 사실적인 코호트까지</h1>
+        <p class="lead">Patient Chronicle을 단일 진실 원장으로 삼아 환자 히스토리, 초진기록지, 119 구급활동일지, NEDIS 레코드를 생성하는 시스템의 전체 개발 계획과 데이터·알고리즘 명세.</p>
+        <div class="cover-meta">
+          <span>문서 상태: 구현 기준선 제안</span>
+          <span>작성일: 2026-07-14</span>
+          <span>대상: 제품·의료·데이터·백엔드·QA</span>
+          <span>용도: 시뮬레이션·교육·소프트웨어 테스트</span>
+        </div>
+      </header>
+
+      <section id="summary">
+        <h2>01. 실행 요약</h2>
+        <p class="lede">핵심 제품은 “문서 생성기”가 아니다. 환자에게 일어난 사건, 관찰된 내용, 당시 알려진 지식, 수행된 처치와 그 근거를 시간순으로 보존하는 <strong>Patient Chronicle Engine</strong>이다. 초진기록지·구급일지·NEDIS는 이 원장에서 서로 다른 지식 범위와 형식 규칙으로 생성되는 투영물이다.</p>
+        <div class="callout"><strong>최우선 결정:</strong> LLM이 환자와 문서를 한 번에 쓰게 하지 않는다. 코호트 분포 엔진이 환자 설계도를 만들고, 임상 전방 시뮬레이터가 Chronicle을 만들며, LLM은 제한된 구조화 확장과 문장화만 담당한다.</div>
+
+        <div class="grid-3">
+          <div class="panel"><h3>개별 사실성</h3><p>한 환자 내부의 시간, 인과, 측정, 처치, 진단 변화와 문서 간 일관성을 보장한다.</p></div>
+          <div class="panel"><h3>코호트 사실성</h3><p>100명 모두가 극적이지 않도록 주변·결합·조건부·시간·결측 분포를 별도로 통제한다.</p></div>
+          <div class="panel"><h3>감사 가능성</h3><p>모든 값과 문장은 출처, 생성 규칙, 모델, 시드, 수정 이력을 역추적할 수 있어야 한다.</p></div>
+        </div>
+
+        <h3>권장 구현 형태</h3>
+        <ul>
+          <li><strong>Canonical store:</strong> PostgreSQL append-only 이벤트·Claim 저장소.</li>
+          <li><strong>Batch analytics:</strong> DuckDB 기반 분포 분석, 코호트 감사, NEDIS 비교.</li>
+          <li><strong>Graph:</strong> 별도 그래프 DB보다 먼저 typed edge 테이블과 materialized graph view 도입.</li>
+          <li><strong>Rules:</strong> 시간·지식 경계·임상 불변식·NEDIS 조건부 필드를 선언형 카탈로그로 관리.</li>
+          <li><strong>LLM:</strong> 구조화 JSON 생성, 제한된 dependency scope, 검증 실패 시 국소 repair.</li>
+          <li><strong>Documents:</strong> Chronicle에서 파생. 생성 문서를 다시 임상 사실의 원본으로 사용하지 않음.</li>
+        </ul>
+
+        <h3>권장 개발 순서</h3>
+        <div class="flow" aria-label="권장 개발 순서">
+          <div class="step">도메인 카탈로그</div><div class="arrow">→</div>
+          <div class="step">Chronicle Kernel</div><div class="arrow">→</div>
+          <div class="step">단일 환자 전방 생성</div><div class="arrow">→</div>
+          <div class="step">문서 투영</div><div class="arrow">→</div>
+          <div class="step">코호트 제어</div><div class="arrow">→</div>
+          <div class="step">감사·선택 재생성</div>
+        </div>
+      </section>
+
+      <section id="evidence">
+        <h2>02. 조사 자료와 설계 교훈</h2>
+        <p>이번 설계는 기존 로컬 프로젝트와 공식 표준을 대조해 구성했다. 아래 평가는 코드와 문서에서 확인한 관찰이며, 그대로 재사용할 부분과 교체할 부분을 구분한다.</p>
+        <div class="table-wrap"><table>
+          <caption>로컬 자료 평가</caption>
+          <thead><tr><th>자료</th><th>유용한 자산</th><th>확인된 한계</th><th>본 설계의 반영</th></tr></thead>
+          <tbody>
+            <tr><td><code>claude-patient-scenario-generator-skill</code></td><td>parameters → narrative → events 3단 구조, 질환·제약 카탈로그, JSONL validator</td><td>인지편향·놓친 red flag를 거의 모든 사례에 강제해 드라마 편향 가능. 집단 분포·임상 Claim·측정 맥락 검증이 약함.</td><td>3단 생성은 유지하되 Blueprint → Chronicle → Document로 재정의. 드라마성은 코호트 제어 변수로 이동.</td></tr>
+            <tr><td><code>medical-record-generator</code></td><td>문서 유형 선택, 문서별 생성, 마지막 일관성 검토</td><td>문서를 각각 생성한 뒤 LLM으로 맞추므로 공통 원장이 없음. <code>simulation_time - time_since_entry</code> 계산은 변수 의미에 따라 시간 역전 위험.</td><td>문서 독립 생성을 폐기하고 Chronicle projection으로 전환. 시간은 명시적 TemporalExtent와 전방 정렬 사용.</td></tr>
+            <tr><td><code>korean-persona</code></td><td>한국 성인 100만 레코드, 지역·직업·가족·문화 맥락, CC BY 4.0</td><td>19세 이상만 포함. 일부 변수 간 독립성 가정과 상호작용 누락이 명시됨.</td><td>성인 baseline seed 후보. 소아는 별도 인구 모형 필요. 라이선스 귀속과 source version을 저장.</td></tr>
+            <tr><td><code>nedis-synthetic-data</code></td><td>동적 패턴 학습, 조건부 생성, 시간·용량 모델, 통계·프라이버시 검증, NEDIS 4.0 매핑</td><td>NEDIS는 encounter-level 표본에 강하지만 Claim·지식·문서 계보를 표현하지 않음.</td><td>분포 감사·DuckDB 파이프라인·NEDIS adapter를 재사용하고 Chronicle canonical model을 상위에 둠.</td></tr>
+            <tr><td><code>icaretok</code> 모의환자 문서</td><td>결정론적 경로 전수 주행과 생성적 시나리오를 분리. 생성 → 분산 검토 → final judge 루프.</td><td>소아 문진 검증에 특화. 응급실 전체 문서·NEDIS·장기 히스토리는 범위 밖.</td><td>결정적 검증과 LLM 생성을 분리하는 원칙, 샤드 감사 개념을 품질 파이프라인에 적용.</td></tr>
+          </tbody>
+        </table></div>
+        <div class="callout warn"><strong>증거에서 얻은 가장 큰 경고:</strong> 환자 하나가 그럴듯한 것과 모집단이 그럴듯한 것은 다르다. Synthea 초기 검증에서도 개별 경로와 별개로 당뇨 합병증 빈도가 크게 왜곡됐다. 따라서 개별 validator와 cohort validator는 별도 제품 기능이어야 한다.</div>
+      </section>
+
+      <section id="scope">
+        <h2>03. 제품 범위와 성공 기준</h2>
+        <h3>제품 목표</h3>
+        <ul>
+          <li>한 환자의 baseline부터 여러 care episode와 encounter를 연결한 longitudinal Chronicle 생성.</li>
+          <li>119 현장·이송, 응급실 초진, 검사·처치·진단 변화, 퇴실·입원 결과를 전방 시뮬레이션.</li>
+          <li>동일 Chronicle에서 구급활동일지, 초진기록지, NEDIS 4.0 호환 레코드 생성.</li>
+          <li>환자 1명의 임상 정합성과 100명 이상의 코호트 분포를 동시에 평가.</li>
+          <li>변수·관계·기준값·코드·규칙을 버전 관리하고 재현 가능한 generation run 제공.</li>
+        </ul>
+
+        <h3>명시적 비목표</h3>
+        <ul>
+          <li>실제 환자의 진단·치료를 자동 결정하는 임상 의사결정 시스템.</li>
+          <li>의료인의 검토·서명 없이 실제 진료기록을 자동 작성·저장하는 기능.</li>
+          <li>합성 데이터만으로 임상 연구의 유효성을 주장하는 기능.</li>
+          <li>첫 버전부터 모든 질환·모든 연령·모든 병원 워크플로를 포괄하는 것.</li>
+          <li>그래프 DB, 벡터 DB, 에이전트 프레임워크 자체를 제품 목표로 삼는 것.</li>
+        </ul>
+
+        <h3>사용 모드</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>모드</th><th>목적</th><th>표집 정책</th><th>필수 메타데이터</th></tr></thead>
+          <tbody>
+            <tr><td><code>observational</code></td><td>특정 기관·기간의 내원 흐름 모사</td><td>확률적 표집, 자연 변동 허용</td><td>모집단 정의, 기간, 기관, 표집 확률</td></tr>
+            <tr><td><code>coverage</code></td><td>폼·API·규칙 테스트</td><td>필드·분기·희귀 상태 최소 커버리지 보장</td><td>coverage target, oversampling flag</td></tr>
+            <tr><td><code>curriculum</code></td><td>교육 난이도별 사례 구성</td><td>난이도·오류 유형 층화</td><td>교육 목표, 난이도, 해설 가시성</td></tr>
+            <tr><td><code>benchmark</code></td><td>모델·버전 비교</td><td>고정 Blueprint와 seed</td><td>불변 fixture, expected assertions</td></tr>
+            <tr><td><code>stress_test</code></td><td>극단·희귀·충돌 처리 검증</td><td>의도적 과표집</td><td>실제 유병률이 아님을 표시, sample weight</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>제품 수준 성공 기준</h3>
+        <ul class="checklist">
+          <li>동일 seed와 동일 버전에서 구조화 Chronicle이 재현된다.</li>
+          <li>필수 clinical·temporal·knowledge invariant의 critical violation이 0건이다.</li>
+          <li>문서에 미래 정보가 유출되지 않는다.</li>
+          <li>코호트의 주요 주변·조건부·시간·결측 분포가 정의된 허용 구간을 통과한다.</li>
+          <li>각 문서 필드가 하나 이상의 Claim·Observation·Unknown 또는 명시적 projection rule로 추적된다.</li>
+          <li>과표집 데이터는 selection probability와 sample weight를 제공한다.</li>
+        </ul>
+      </section>
+
+      <section id="principles">
+        <h2>04. 설계 원칙</h2>
+        <div class="grid-2">
+          <div class="panel"><h3>Chronicle first</h3><p>문서는 결과물이다. 문서끼리 서로 맞추지 않고 공통 원장에 각각 맞춘다.</p></div>
+          <div class="panel"><h3>Claim, not truth</h3><p>환자 진술·보호자 진술·기기 측정·의사 판단을 덮어쓰지 않고 출처별 Claim으로 보존한다.</p></div>
+          <div class="panel"><h3>Forward-only clinical simulation</h3><p>잠재 상태에서 관찰과 행동이 시간순으로 발생한다. 결과를 정한 뒤 과거를 교과서적으로 꾸미지 않는다.</p></div>
+          <div class="panel"><h3>Unknown is data</h3><p>공란을 null로 축약하지 않는다. 질문 안 함, 측정 실패, 당시 미상, 충돌, 비대상 등을 구분한다.</p></div>
+          <div class="panel"><h3>Cohort before prose</h3><p>전체 환자의 Blueprint와 분포를 먼저 승인한 뒤 비싼 상세·문장 생성을 수행한다.</p></div>
+          <div class="panel"><h3>Rules own safety</h3><p>시간, 코드, 범위, 지식 경계, 조건부 필드는 결정적 규칙이 판정한다. LLM은 최종 권위가 아니다.</p></div>
+          <div class="panel"><h3>Append, supersede, never erase</h3><p>수정은 원본 삭제가 아니라 새로운 버전과 <code>supersedes</code> 관계로 남긴다.</p></div>
+          <div class="panel"><h3>Version everything</h3><p>스키마, 변수, 코드 체계, 기준값, 분포, 프롬프트, 모델, seed, adapter를 generation run에 고정한다.</p></div>
+        </div>
+      </section>
+
+      <section id="ontology">
+        <h2>05. 온톨로지와 토폴로지</h2>
+        <p class="lede">하나의 거대 그래프를 만드는 대신 목적이 다른 그래프를 같은 typed entity와 edge 위에 겹쳐 사용한다. 그래프의 역할은 저장 형식보다 추론 경로와 영향 범위를 명시하는 것이다.</p>
+        <div class="diagram">
+          <svg viewBox="0 0 1040 520" role="img" aria-label="Patient Chronicle 온톨로지 계층">
+            <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#b94f37"/></marker></defs>
+            <rect x="20" y="20" width="1000" height="70" rx="4" fill="#173f37"/><text x="520" y="62" text-anchor="middle" fill="#fff" font-size="24" font-family="sans-serif">Patient → Chronicle → Episode → Encounter</text>
+            <rect x="40" y="140" width="170" height="76" fill="#dcece6" stroke="#1f6657"/><text x="125" y="174" text-anchor="middle" font-size="18">Reality Layer</text><text x="125" y="198" text-anchor="middle" font-size="12">latent clinical state</text>
+            <rect x="240" y="140" width="170" height="76" fill="#fffdf8" stroke="#7b9187"/><text x="325" y="174" text-anchor="middle" font-size="18">Observation</text><text x="325" y="198" text-anchor="middle" font-size="12">measure · report</text>
+            <rect x="440" y="140" width="170" height="76" fill="#fffdf8" stroke="#7b9187"/><text x="525" y="174" text-anchor="middle" font-size="18">Knowledge</text><text x="525" y="198" text-anchor="middle" font-size="12">Claim · Evidence</text>
+            <rect x="640" y="140" width="170" height="76" fill="#fffdf8" stroke="#7b9187"/><text x="725" y="174" text-anchor="middle" font-size="18">Decision</text><text x="725" y="198" text-anchor="middle" font-size="12">action · intervention</text>
+            <rect x="840" y="140" width="170" height="76" fill="#f3d7cb" stroke="#b94f37"/><text x="925" y="174" text-anchor="middle" font-size="18">Document</text><text x="925" y="198" text-anchor="middle" font-size="12">projection only</text>
+            <path d="M210 178 H238 M410 178 H438 M610 178 H638 M810 178 H838" stroke="#b94f37" stroke-width="2" marker-end="url(#arr)"/>
+            <rect x="50" y="290" width="180" height="64" fill="#fffdf8" stroke="#7b9187"/><text x="140" y="328" text-anchor="middle">Temporal Graph</text>
+            <rect x="250" y="290" width="180" height="64" fill="#fffdf8" stroke="#7b9187"/><text x="340" y="328" text-anchor="middle">Causal Graph</text>
+            <rect x="450" y="290" width="180" height="64" fill="#fffdf8" stroke="#7b9187"/><text x="540" y="328" text-anchor="middle">Evidence Graph</text>
+            <rect x="650" y="290" width="180" height="64" fill="#fffdf8" stroke="#7b9187"/><text x="740" y="328" text-anchor="middle">Identity Graph</text>
+            <rect x="850" y="290" width="160" height="64" fill="#fffdf8" stroke="#7b9187"/><text x="930" y="328" text-anchor="middle">Lineage Graph</text>
+            <rect x="160" y="420" width="720" height="60" fill="#102c28"/><text x="520" y="456" text-anchor="middle" fill="#fff" font-size="19">typed relation_edge + versioned relation_spec + meta-edge rules</text>
+            <path d="M140 354 L260 420 M340 354 L410 420 M540 354 L540 420 M740 354 L670 420 M930 354 L790 420" stroke="#1f6657" stroke-width="2"/>
+          </svg>
+        </div>
+
+        <h3>6개 분석 공간의 핵심 엔티티</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>공간</th><th>핵심 질문</th><th>주요 엔티티·관계</th><th>대표 검증</th></tr></thead>
+          <tbody>
+            <tr><td>계층</td><td>환자·episode·encounter·event는 어느 수준인가?</td><td><code>part_of</code>, <code>contains</code>, <code>subepisode_of</code></td><td>고아 이벤트, 잘못된 상위 연결</td></tr>
+            <tr><td>시간</td><td>언제 발생·관찰·기록·인지됐는가?</td><td><code>before</code>, <code>overlaps</code>, TemporalExtent</td><td>DAG cycle, 음수 간격, clock mismatch</td></tr>
+            <tr><td>재귀</td><td>Claim·규칙·온톨로지가 어떻게 수정되는가?</td><td><code>supersedes</code>, Unknown Registry, ontology version</td><td>종료 없는 repair, 버전 계보 단절</td></tr>
+            <tr><td>구조</td><td>관찰·증거·결정·문서는 어떻게 연결되는가?</td><td>typed edge, cardinality, hyperedge entity</td><td>필수 관계 누락, 잘못된 cardinality</td></tr>
+            <tr><td>인과</td><td>원인·기여·연관·반응을 어떻게 구분하는가?</td><td><code>causes</code>, <code>contributes_to</code>, <code>associated_with</code></td><td>상관관계의 인과 오표기, 역인과</td></tr>
+            <tr><td>교차</td><td>여러 공간의 허브는 무엇인가?</td><td>Claim, ChronicleEvent, Unknown, RelationSpec</td><td>통합 provenance와 영향 분석</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>온톨로지 핵심 클래스</h3>
+        <p><span class="tag">Patient</span><span class="tag">BaselineProfile</span><span class="tag">CareEpisode</span><span class="tag">Encounter</span><span class="tag">ChronicleEvent</span><span class="tag">TemporalExtent</span><span class="tag">ClinicalState</span><span class="tag">Observation</span><span class="tag">Claim</span><span class="tag">Evidence</span><span class="tag">Unknown</span><span class="tag">Decision</span><span class="tag">Intervention</span><span class="tag">Response</span><span class="tag">Agent</span><span class="tag">Device</span><span class="tag">Location</span><span class="tag">Concept</span><span class="tag">DocumentProjection</span><span class="tag">CohortRun</span><span class="tag">PatientBlueprint</span></p>
+
+        <h3>주요 edge vocabulary</h3>
+        <p><span class="tag">part_of</span><span class="tag">occurred_during</span><span class="tag">before</span><span class="tag">observed_by</span><span class="tag">reported_by</span><span class="tag">known_by</span><span class="tag">supports</span><span class="tag">contradicts</span><span class="tag">supersedes</span><span class="tag">derived_from</span><span class="tag">measured_by</span><span class="tag">triggered</span><span class="tag">responded_to</span><span class="tag">projected_into</span><span class="tag">coded_as</span><span class="tag">probably_same_as</span><span class="tag">constrained_by</span><span class="tag">repaired_by</span></p>
+      </section>
+
+      <section id="architecture">
+        <h2>06. 시스템 아키텍처</h2>
+        <div class="diagram">
+          <svg viewBox="0 0 1120 620" role="img" aria-label="시스템 논리 아키텍처">
+            <defs><marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#b94f37"/></marker></defs>
+            <rect x="30" y="25" width="1060" height="58" fill="#173f37"/><text x="560" y="61" text-anchor="middle" fill="white" font-size="21">Control Plane — schema · variables · concepts · rules · distributions · prompt/model versions</text>
+            <g fill="#fffdf8" stroke="#7b9187">
+              <rect x="40" y="135" width="180" height="82"/><rect x="260" y="135" width="180" height="82"/><rect x="480" y="135" width="180" height="82"/><rect x="700" y="135" width="180" height="82"/><rect x="920" y="135" width="160" height="82"/>
+            </g>
+            <g font-size="17" text-anchor="middle"><text x="130" y="171">World &amp; Cohort</text><text x="130" y="196">Planner</text><text x="350" y="171">Blueprint</text><text x="350" y="196">Validator</text><text x="570" y="171">Chronicle</text><text x="570" y="196">Simulator</text><text x="790" y="171">Document</text><text x="790" y="196">Projector</text><text x="1000" y="171">Cohort</text><text x="1000" y="196">Auditor</text></g>
+            <g stroke="#b94f37" stroke-width="2" marker-end="url(#arr2)"><path d="M220 176 H258"/><path d="M440 176 H478"/><path d="M660 176 H698"/><path d="M880 176 H918"/></g>
+            <rect x="130" y="295" width="860" height="110" fill="#dcece6" stroke="#1f6657"/><text x="560" y="330" text-anchor="middle" font-size="21">Domain Kernel API</text><text x="560" y="360" text-anchor="middle" font-size="15">Patient · Episode · Event · Claim · Observation · Unknown · Relation · Provenance</text><text x="560" y="385" text-anchor="middle" font-size="14">append-only commands · invariant checks · dependency closure · knowledge frontier</text>
+            <g fill="#102c28"><rect x="70" y="485" width="230" height="75"/><rect x="330" y="485" width="210" height="75"/><rect x="570" y="485" width="210" height="75"/><rect x="810" y="485" width="240" height="75"/></g>
+            <g fill="white" font-size="16" text-anchor="middle"><text x="185" y="518">PostgreSQL</text><text x="185" y="542">canonical + edge store</text><text x="435" y="518">DuckDB</text><text x="435" y="542">batch analytics</text><text x="675" y="518">Object Store</text><text x="675" y="542">artifacts · reports</text><text x="930" y="518">LLM Gateway</text><text x="930" y="542">local / remote adapters</text></g>
+            <g stroke="#1f6657" stroke-width="2"><path d="M360 405 L185 485"/><path d="M490 405 L435 485"/><path d="M630 405 L675 485"/><path d="M760 405 L930 485"/></g>
+          </svg>
+        </div>
+
+        <h3>기술 스택 기준안</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>영역</th><th>MVP 권장</th><th>선택 이유</th><th>확장 시점</th></tr></thead>
+          <tbody>
+            <tr><td>Backend</td><td>Python 3.12+, FastAPI, Pydantic v2</td><td>통계·의료 데이터 생태계와 기존 NEDIS 코드 재사용</td><td>대량 worker만 별도 프로세스로 분리</td></tr>
+            <tr><td>Canonical DB</td><td>PostgreSQL 16+, SQLAlchemy, Alembic</td><td>트랜잭션, JSONB, 제약, append-only, typed edge를 함께 처리</td><td>탐색 병목이 확인될 때 graph DB 검토</td></tr>
+            <tr><td>Analytics</td><td>DuckDB + Polars/Pandas</td><td>코호트 분포·NEDIS 비교·대량 검증에 적합</td><td>수억 건 이상에서 distributed engine 검토</td></tr>
+            <tr><td>Queue</td><td>PostgreSQL job table</td><td>MVP 운영 단순성, 재시도·lease 구현 가능</td><td>긴 워크플로가 늘면 Temporal 계열 검토</td></tr>
+            <tr><td>LLM</td><td>Provider-neutral gateway</td><td>모델 교체와 replay, prompt/model version 고정</td><td>모델별 성능·비용 라우팅 추가</td></tr>
+            <tr><td>UI</td><td>Next.js 기반 검토 콘솔</td><td>Blueprint·timeline·문서 diff·audit 확인</td><td>MVP API 안정화 후</td></tr>
+            <tr><td>Interchange</td><td>JSON Schema + FHIR adapter</td><td>내부 모델과 외부 표준을 분리</td><td>기관별 Implementation Guide 추가</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>권장 저장소 구조</h3>
+        <pre><code>patients-generator/
+├── apps/
+│   ├── api/                  # FastAPI commands, queries, job endpoints
+│   └── review-console/       # timeline · cohort · document review UI
+├── src/
+│   ├── domain/               # entities, value objects, invariants
+│   ├── ontology/             # concepts, relation specs, meta-edge rules
+│   ├── cohort/               # world model, planner, sampler, auditor
+│   ├── chronicle/            # forward simulator, observation process
+│   ├── projection/           # initial-note, ambulance, NEDIS adapters
+│   ├── llm/                  # provider adapters, prompts, repair
+│   ├── validation/           # structural, clinical, temporal, privacy
+│   └── persistence/          # PostgreSQL, DuckDB, artifact storage
+├── schemas/                  # JSON Schema / Pydantic-exported contracts
+├── catalogs/                 # variables, concepts, relations, unknown types
+├── rules/                    # invariant and projection policies
+├── migrations/
+├── tests/
+│   ├── fixtures/
+│   ├── contract/
+│   ├── property/
+│   ├── cohort/
+│   └── projection/
+└── docs/</code></pre>
+      </section>
+
+      <section id="pipeline">
+        <h2>07. 전체 생성 파이프라인</h2>
+        <p class="lede">상세 생성 전에 전체 코호트의 설계도를 승인한다. 생성 후 분포 보정은 안전망이며, 최초 분포 설계를 대체하지 않는다.</p>
+        <div class="flow">
+          <div class="step">0. Generation Contract</div><div class="arrow">→</div>
+          <div class="step">1. World Timeline</div><div class="arrow">→</div>
+          <div class="step">2. Cohort Plan</div><div class="arrow">→</div>
+          <div class="step">3. Blueprints</div><div class="arrow">→</div>
+          <div class="step">4. Chronicle</div><div class="arrow">→</div>
+          <div class="step">5. Documents</div><div class="arrow">→</div>
+          <div class="step">6. Audit &amp; Repair</div>
+        </div>
+
+        <h3>단계별 책임과 산출물</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>단계</th><th>주요 입력</th><th>처리</th><th>산출물</th><th>실패 시</th></tr></thead>
+          <tbody>
+            <tr><td>0. Contract</td><td>목적, N, 기관, 기간, 연령, 질환 범위</td><td>모드·소스·허용 오차·privacy policy 고정</td><td><code>CohortRun</code></td><td>사용자 승인 전 생성 금지</td></tr>
+            <tr><td>1. World</td><td>계절, 병원 유형, 용량, 유행·재난</td><td>도착 강도와 공유 ContextEvent 생성</td><td><code>WorldState[]</code></td><td>독립 vignette 모드로 명시적 전환</td></tr>
+            <tr><td>2. Cohort</td><td>분포 target, association spec</td><td>soft constraint 기반 joint sample</td><td>target ledger</td><td>근거 부족 target를 Unknown으로 등록</td></tr>
+            <tr><td>3. Blueprint</td><td>target ledger</td><td>latent condition·severity·outcome·intensity 할당</td><td><code>PatientBlueprint[]</code></td><td>비용 낮은 재표집</td></tr>
+            <tr><td>4. Chronicle</td><td>Blueprint, rules, concepts</td><td>임상 상태 → 관찰 → 판단 → 행동 전방 생성</td><td>append-only Chronicle</td><td>의존성 closure 범위만 재생성</td></tr>
+            <tr><td>5. Projection</td><td>Chronicle, document policy</td><td>지식 경계와 필드 규칙 적용</td><td>초진·구급·NEDIS</td><td>projection만 재실행</td></tr>
+            <tr><td>6. Audit</td><td>전체 환자·문서</td><td>개별·코호트·문서·privacy 평가</td><td>audit finding, repair plan</td><td>최소 비용 선택 재생성</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>LLM 전체 생성과 단계 생성의 역할 분리</h3>
+        <ul>
+          <li><strong>전체 생성 금지 영역:</strong> 코호트 구성, 최종 prevalence, temporal ordering, NEDIS sentinel, 필수 불변식.</li>
+          <li><strong>단계 생성 권장 영역:</strong> 보호자 진술, HPI 문장화, 관찰 표현, 문서 축약, provider style.</li>
+          <li><strong>LLM 제안 후 규칙 승인:</strong> 감별진단 후보, evidence 연결, 서술형 Unknown reason.</li>
+          <li><strong>결정적 코드 전용:</strong> 계산값, 시간 차이, 기준값 적용, 코드 변환, projection completeness.</li>
+        </ul>
+      </section>
+
+      <section id="schema">
+        <h2>08. 데이터 스키마 상세</h2>
+        <p class="lede">Canonical schema는 문서 필드가 아니라 임상·관찰·지식·행동의 공통 모델이다. 모든 테이블은 <code>schema_version</code>, 생성 run, provenance를 추적할 수 있어야 한다.</p>
+
+        <h3>공통 필드 규약</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>필드</th><th>타입</th><th>규칙</th></tr></thead>
+          <tbody>
+            <tr><td><code>id</code></td><td>UUIDv7 / ULID</td><td>시간 정렬 가능한 불투명 식별자. 실제 기관 ID 사용 금지.</td></tr>
+            <tr><td><code>schema_version</code></td><td>semver</td><td>읽기·쓰기 계약 버전.</td></tr>
+            <tr><td><code>generation_run_id</code></td><td>FK</td><td>모델·프롬프트·시드·코드·카탈로그 버전을 역추적.</td></tr>
+            <tr><td><code>created_at</code></td><td>timestamptz</td><td>시스템 생성 시각. 임상 발생 시각과 구분.</td></tr>
+            <tr><td><code>valid_from / valid_to</code></td><td>timestamptz?</td><td>지식 또는 규칙의 유효 기간.</td></tr>
+            <tr><td><code>status</code></td><td>enum</td><td><code>active | superseded | refuted | withdrawn</code>.</td></tr>
+            <tr><td><code>extensions</code></td><td>JSONB</td><td>임시 확장. 반복 사용되면 정식 variable/concept로 승격.</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>핵심 엔티티 필드</h3>
+        <div class="table-wrap"><table>
+          <caption>Patient · Episode · Encounter · Event</caption>
+          <thead><tr><th>엔티티</th><th>필수 필드</th><th>주요 제약</th></tr></thead>
+          <tbody>
+            <tr><td><code>patient</code></td><td>id, synthetic_identity, sex_at_birth, birth_temporal, residence_region, persona_source</td><td>직접식별자는 합성. 나이는 encounter 시점에서 계산. 성인 persona source로 소아 생성 금지.</td></tr>
+            <tr><td><code>baseline_profile</code></td><td>patient_id, effective_period, conditions, medications, allergies, function, social_context</td><td>과거력 부재와 미상 구분. 모든 요소는 Claim으로 연결.</td></tr>
+            <tr><td><code>care_episode</code></td><td>patient_id, episode_type, temporal_extent, boundary_confidence</td><td>episode 경계는 추정 가능. 병합·분할 계보 보존.</td></tr>
+            <tr><td><code>encounter</code></td><td>episode_id, setting, organization, arrival, departure, disposition</td><td>퇴실은 도착보다 이후. 입원·전원 등 조건부 필드 적용.</td></tr>
+            <tr><td><code>chronicle_event</code></td><td>episode_id, event_type, temporal_extent, actor, location</td><td>불변 payload가 아니라 event subtype별 schema 참조.</td></tr>
+            <tr><td><code>temporal_extent</code></td><td>earliest, latest, precision, clock_source, confidence</td><td>정확 시각·구간·상대 시각 모두 표현. <code>earliest ≤ latest</code>.</td></tr>
+          </tbody>
+        </table></div>
+
+        <div class="table-wrap"><table>
+          <caption>Claim · Evidence · Unknown</caption>
+          <thead><tr><th>엔티티</th><th>필수 필드</th><th>주요 제약</th></tr></thead>
+          <tbody>
+            <tr><td><code>claim</code></td><td>subject, predicate, object/value, asserted_by, asserted_at, effective_time, certainty, polarity, status</td><td>부정과 부재 구분. 원본 수정 금지. 파생 Claim은 근거 필수.</td></tr>
+            <tr><td><code>evidence</code></td><td>evidence_type, source_entity, available_from, quality, method</td><td>evidence가 Claim보다 미래에 생기면 당시 Claim의 근거로 연결 불가.</td></tr>
+            <tr><td><code>unknown</code></td><td>target, kind, introduced_at, applicable_window, status, impact</td><td>null 대체물이 아니라 독립 객체. 해소 시 <code>resolved_by</code> 연결.</td></tr>
+            <tr><td><code>claim_evidence</code></td><td>claim_id, evidence_id, relation, weight</td><td><code>supports | contradicts | weakens | derived_from</code>.</td></tr>
+          </tbody>
+        </table></div>
+
+        <pre><code>{
+  "claim_id": "clm_01J...",
+  "subject": {"type": "patient", "id": "pat_01J..."},
+  "predicate": "has_symptom",
+  "object": {"concept_id": "symptom.chest_discomfort"},
+  "polarity": "positive",
+  "asserted_by": {"type": "patient", "id": "pat_01J..."},
+  "asserted_at": "2026-07-14T10:08:00+09:00",
+  "effective_time": {
+    "earliest": "2026-07-14T09:00:00+09:00",
+    "latest": "2026-07-14T09:30:00+09:00",
+    "precision": "estimated"
+  },
+  "certainty": 0.78,
+  "status": "active",
+  "evidence_ids": ["evd_01J..."]
+}</code></pre>
+
+        <div class="table-wrap"><table>
+          <caption>Observation · Intervention · Decision</caption>
+          <thead><tr><th>엔티티</th><th>필수 필드</th><th>주요 제약</th></tr></thead>
+          <tbody>
+            <tr><td><code>observation</code></td><td>variable_id, value, unit, effective_time, observer, method, quality</td><td>device·body site·position·처치 전후 맥락을 보존. 실패 측정은 값 대신 Unknown.</td></tr>
+            <tr><td><code>clinical_state</code></td><td>latent variables, state_time, transition_source</td><td>합성 엔진 내부 전용. 문서 projector는 직접 접근 금지.</td></tr>
+            <tr><td><code>decision</code></td><td>decision_type, decided_by, decided_at, considered_options, rationale_claims</td><td>당시 사용 가능 evidence만 연결.</td></tr>
+            <tr><td><code>intervention</code></td><td>type, code, start/end, performer, route/site, dose, intent</td><td>명령·수행·중단을 구분. 약물은 dose·unit·route 필수 정책.</td></tr>
+            <tr><td><code>response</code></td><td>intervention_id, observation_id, latency, attribution_certainty</td><td>시간적 후행은 필요조건일 뿐 인과 확정은 아님.</td></tr>
+            <tr><td><code>clinical_hypothesis</code></td><td>concept, rank, probability_band, status, created_at</td><td>감별·의증·확정 진단을 분리. 시간에 따른 rank 변화 보존.</td></tr>
+          </tbody>
+        </table></div>
+
+        <div class="table-wrap"><table>
+          <caption>Document · Lineage · Provenance</caption>
+          <thead><tr><th>엔티티</th><th>필수 필드</th><th>주요 제약</th></tr></thead>
+          <tbody>
+            <tr><td><code>document_projection</code></td><td>document_type, template_version, encounter, authored_at, knowledge_frontier, content</td><td>canonical truth 아님. 재생성 가능. 서명 상태 분리.</td></tr>
+            <tr><td><code>document_field_lineage</code></td><td>document_id, field_path, source_ids, rule_id, transform</td><td>필드마다 source 또는 explicit blank reason 필요.</td></tr>
+            <tr><td><code>generation_artifact</code></td><td>run_id, stage, input_hash, output_hash, model, prompt_version</td><td>민감 prompt·원문 로그의 보존 정책 분리.</td></tr>
+            <tr><td><code>audit_event</code></td><td>actor, action, target, recorded_at, purpose</td><td>생성·조회·수정·export 이력. 임상 provenance와 운영 audit 분리.</td></tr>
+          </tbody>
+        </table></div>
+
+        <div class="table-wrap"><table>
+          <caption>Cohort · Distribution · Repair</caption>
+          <thead><tr><th>엔티티</th><th>필수 필드</th><th>주요 제약</th></tr></thead>
+          <tbody>
+            <tr><td><code>cohort_run</code></td><td>mode, population_size, setting, period, seed, version bundle</td><td>완전한 재현 manifest 역할.</td></tr>
+            <tr><td><code>distribution_target</code></td><td>metric, variables, conditions, target, tolerance, source, confidence</td><td>주변·결합·조건부·시간·결측·그래프 target 지원.</td></tr>
+            <tr><td><code>patient_blueprint</code></td><td>stratum, latent process, acuity, outcome class, intensity vector, missingness profile</td><td>문장이 아닌 compact structured plan.</td></tr>
+            <tr><td><code>cohort_audit</code></td><td>metric_id, observed, target, distance, threshold, pass</td><td>평균 점수 하나로 축약 금지.</td></tr>
+            <tr><td><code>repair_action</code></td><td>finding, selected patients, root nodes, dependency closure, cost, before/after hashes</td><td>leaf patch 금지. 영향 범위 재생성.</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>Relation storage</h3>
+        <pre><code>relation_edge(
+  id, relation_spec_id,
+  source_type, source_id,
+  target_type, target_id,
+  effective_from, effective_to,
+  confidence, asserted_by,
+  generation_run_id, status,
+  attributes_jsonb
+)
+
+relation_spec(
+  id, name, inverse_name,
+  source_class, target_class,
+  cardinality, transitive, symmetric,
+  causal_status, creation_rule_id,
+  valid_from, valid_to, version
+)</code></pre>
+        <p>환자·기기·관찰자·부위·시간·처치 맥락을 동시에 연결해야 하는 측정은 단순 edge가 아니라 <code>Observation</code>이라는 관계 객체로 모델링한다. 이 방식이 hyperedge 의미를 보존한다.</p>
+      </section>
+
+      <section id="variables">
+        <h2>09. 변수 카탈로그</h2>
+        <p class="lede">변수는 단순 컬럼 이름이 아니라 타입, 단위, 시간성, 결측 의미, 기준값 정책, 연관 관계, 문서 투영을 포함하는 버전된 명세다. 아래 목록은 MVP canonical core이며 질환별 module이 확장한다.</p>
+
+        <pre><code>VariableSpec:
+  id: vital.systolic_blood_pressure
+  value_type: quantity
+  unit: mmHg
+  cardinality: time_series
+  temporal_semantics: effective_at
+  missing_policy: unknown_object_required
+  reference_policy_id: rr.vital.sbp
+  plausible_policy_id: guard.vital.sbp
+  associations:
+    - relation_spec: measured_with
+      target: vital.diastolic_blood_pressure
+    - relation_spec: influenced_by
+      target: intervention.iv_fluid
+  projections:
+    - ambulance.vitals.sbp
+    - initial_note.vitals.sbp
+    - nedis.EMIHPTMI.ptmihibp</code></pre>
+
+        <h3>환자·인구·사회 변수</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Variable ID</th><th>타입</th><th>기준·분포 정책</th><th>강한 연관 항목</th><th>제약·Unknown</th></tr></thead>
+          <tbody>
+            <tr><td><code>patient.sex_at_birth</code></td><td>coded concept</td><td>모집단·연령 cohort 조건부 분포</td><td>임신 가능성, 질환 위험, 기준범위</td><td>gender identity와 별도. unknown 허용.</td></tr>
+            <tr><td><code>patient.birth_time</code></td><td>TemporalExtent</td><td>정확 일자 또는 연령 구간</td><td>age_at_event, 소아 기준값</td><td>실제 주민번호 생성 금지.</td></tr>
+            <tr><td><code>patient.age_at_event</code></td><td>derived duration</td><td>birth_time과 event time으로 계산</td><td>KTAS, 활력 기준, 질환 prior</td><td>저장보다 파생 권장.</td></tr>
+            <tr><td><code>patient.residence_region</code></td><td>coded region</td><td>시도·시군구 versioned code</td><td>기관 접근성, 이송 시간, persona</td><td>정밀주소 금지. 지역 코드 버전 저장.</td></tr>
+            <tr><td><code>persona.occupation</code></td><td>coded + text</td><td>연령·교육·지역 조건부</td><td>노출, 내원 지연, 일정 제약</td><td>성인 source를 소아에 적용 금지.</td></tr>
+            <tr><td><code>persona.education_level</code></td><td>ordinal</td><td>출생 cohort·지역 조건부</td><td>health literacy, 정보원</td><td>직접 인과로 단정 금지.</td></tr>
+            <tr><td><code>persona.household_type</code></td><td>coded</td><td>연령·혼인 상태 조건부</td><td>보호자, 발견 시간, 지원</td><td>복수 동거 관계 표현.</td></tr>
+            <tr><td><code>persona.socioeconomic_context</code></td><td>latent ordinal</td><td>여러 관찰 변수에서 파생</td><td>비용 민감도, 접근성, 지연</td><td>낙인 변수로 직접 문서화 금지.</td></tr>
+            <tr><td><code>persona.health_literacy</code></td><td>latent ordinal</td><td>source-backed profile 또는 생성 정책</td><td>설명 이해, 정보 탐색</td><td>교육 수준과 동일시 금지.</td></tr>
+            <tr><td><code>persona.language</code></td><td>coded list</td><td>주·보조 언어</td><td>의사소통, 통역, history quality</td><td>unable_to_answer와 구분.</td></tr>
+            <tr><td><code>persona.transport_access</code></td><td>coded list</td><td>지역·가구 조건부</td><td>119 이용, 내원 지연</td><td>사건 시점 가용성 별도.</td></tr>
+            <tr><td><code>persona.caregiving_role</code></td><td>coded relation</td><td>Patient–RelatedPerson 관계</td><td>보고자, 의사결정권, 정보 품질</td><td>법정대리인과 일상 보호자 구분.</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>Baseline 임상 변수</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Variable ID</th><th>타입</th><th>기준·분포 정책</th><th>강한 연관 항목</th><th>제약·Unknown</th></tr></thead>
+          <tbody>
+            <tr><td><code>baseline.condition</code></td><td>Concept[]</td><td>연령·성별·질환 동반 모델</td><td>약물, baseline vital, acute risk</td><td>active/resolved/history 구분.</td></tr>
+            <tr><td><code>baseline.medication</code></td><td>MedicationStatement[]</td><td>condition·연령 조건부</td><td>알레르기, 상호작용, 활력</td><td>복용 처방과 실제 adherence 분리.</td></tr>
+            <tr><td><code>baseline.allergy</code></td><td>coded + reaction</td><td>source별 확신도</td><td>약물 선택, adverse event</td><td>NKDA는 질문 완료가 확인될 때만.</td></tr>
+            <tr><td><code>baseline.prior_procedure</code></td><td>Procedure[]</td><td>시간·부위 포함</td><td>현재 증상, 영상, 수술 위험</td><td>remote history 허용.</td></tr>
+            <tr><td><code>baseline.pregnancy_status</code></td><td>coded + gestational age</td><td>사건 시점 상태</td><td>기준범위, 검사·약물 선택</td><td>not_applicable, not_tested 구분.</td></tr>
+            <tr><td><code>baseline.smoking_exposure</code></td><td>quantity + status</td><td>pack-year와 current status</td><td>호흡·심혈관 위험</td><td>간접흡연 별도.</td></tr>
+            <tr><td><code>baseline.alcohol_use</code></td><td>pattern</td><td>기간·빈도·최근 섭취</td><td>손상, 의식, 약물</td><td>낙인 표현 금지.</td></tr>
+            <tr><td><code>baseline.functional_status</code></td><td>ordinal + components</td><td>이동·ADL·인지</td><td>disposition, caregiver, frailty</td><td>급성 변화와 baseline 분리.</td></tr>
+            <tr><td><code>baseline.frailty</code></td><td>score/profile</td><td>도구 version 명시</td><td>입원, 회복, vital response</td><td>도구 없이 임의 점수 금지.</td></tr>
+            <tr><td><code>baseline.cognitive_status</code></td><td>coded</td><td>평상시 상태</td><td>history reliability, consent</td><td>현재 의식과 분리.</td></tr>
+            <tr><td><code>baseline.body_weight</code></td><td>kg time series</td><td>연령·성별 분포, 최근 측정</td><td>약물 용량, 체액, 소아</td><td>추정/실측 method 저장.</td></tr>
+            <tr><td><code>baseline.body_height</code></td><td>cm time series</td><td>연령·성별 분포</td><td>BMI, 소아 성장</td><td>측정 시점 저장.</td></tr>
+            <tr><td><code>baseline.vital_state</code></td><td>state vector</td><td>개인별 평소 범위</td><td>acute deviation</td><td>모집단 정상치와 구분.</td></tr>
+            <tr><td><code>baseline.care_preferences</code></td><td>coded claims</td><td>DNR·치료 선호·대리인</td><td>resuscitation decision</td><td>법적 문서와 구두 진술 구분.</td></tr>
+            <tr><td><code>baseline.healthcare_access</code></td><td>context profile</td><td>주치의·보험·거리</td><td>care seeking, follow-up</td><td>보험유형과 동일시 금지.</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>Episode·증상·상황 변수</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Variable ID</th><th>타입</th><th>기준·분포 정책</th><th>강한 연관 항목</th><th>제약·Unknown</th></tr></thead>
+          <tbody>
+            <tr><td><code>episode.primary_latent_process</code></td><td>Concept</td><td>질환 prior + cohort target</td><td>증상·검사·경과</td><td>generator-only; 문서 직접 접근 금지.</td></tr>
+            <tr><td><code>episode.competing_process</code></td><td>Concept[]</td><td>동반·대체 설명</td><td>diagnostic ambiguity</td><td>복수 episode 가능.</td></tr>
+            <tr><td><code>episode.onset_time</code></td><td>TemporalExtent</td><td>정확/추정/구간</td><td>care delay, eligibility</td><td>환자 보고와 true onset 분리.</td></tr>
+            <tr><td><code>episode.discovery_time</code></td><td>TemporalExtent</td><td>관찰자별</td><td>신고, delay</td><td>onset과 다를 수 있음.</td></tr>
+            <tr><td><code>episode.trigger</code></td><td>Concept/Unknown</td><td>causal certainty 포함</td><td>손상, 노출, 운동</td><td>원인 미상 허용.</td></tr>
+            <tr><td><code>episode.mechanism</code></td><td>coded</td><td>질병/손상별 ontology</td><td>injury pattern, NEDIS</td><td>질병 외일 때 조건부 필수.</td></tr>
+            <tr><td><code>episode.intent</code></td><td>coded</td><td>손상·중독 조건부</td><td>보호, 정신건강, 법적 절차</td><td>불확실성·민감 접근제어.</td></tr>
+            <tr><td><code>symptom.concept</code></td><td>Concept</td><td>UMLS/local mapping</td><td>disease process, chief complaint</td><td>원문 표현 보존.</td></tr>
+            <tr><td><code>symptom.severity</code></td><td>ordinal/scale</td><td>도구·보고자별</td><td>acuity, intervention</td><td>scale version 필수.</td></tr>
+            <tr><td><code>symptom.course</code></td><td>coded trajectory</td><td>악화·호전·변동</td><td>timing, care seeking</td><td>요약은 관찰 시계열에서 파생.</td></tr>
+            <tr><td><code>symptom.associated_feature</code></td><td>Claim[]</td><td>질환 module 조건부</td><td>differential, KTAS</td><td>질문 안 함과 음성 구분.</td></tr>
+            <tr><td><code>context.scene_type</code></td><td>coded location</td><td>주거·도로·시설 등</td><td>손상, 발견자, EMS 접근</td><td>정밀주소와 분리.</td></tr>
+            <tr><td><code>context.shared_event</code></td><td>ContextEvent FK</td><td>폭염·유행·다수사상</td><td>환자 군집, arrival rate</td><td>환자 iid 가정 완화.</td></tr>
+            <tr><td><code>behavior.self_treatment</code></td><td>Intervention[]</td><td>persona·증상 조건부</td><td>증상 변화, 약물력</td><td>기록 외 의료행위 허용.</td></tr>
+            <tr><td><code>behavior.care_seeking_delay</code></td><td>derived duration</td><td>onset/discovery → contact</td><td>outcome, access, literacy</td><td>인과 해석 주의.</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>119 현장·이송 변수</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Variable ID</th><th>타입</th><th>기준·분포 정책</th><th>강한 연관 항목</th><th>제약·Unknown</th></tr></thead>
+          <tbody>
+            <tr><td><code>ems.call_received_at</code></td><td>timestamptz</td><td>world arrival process</td><td>dispatch, response interval</td><td>clock source 저장.</td></tr>
+            <tr><td><code>ems.dispatch_at</code></td><td>timestamptz</td><td>운영 지연 분포</td><td>station load</td><td>call_received 이후.</td></tr>
+            <tr><td><code>ems.scene_arrival_at</code></td><td>timestamptz</td><td>거리·교통·가용성 조건부</td><td>response interval</td><td>dispatch 이후.</td></tr>
+            <tr><td><code>ems.patient_contact_at</code></td><td>timestamptz</td><td>scene access 조건부</td><td>first observation</td><td>arrival 이후.</td></tr>
+            <tr><td><code>ems.scene_departure_at</code></td><td>timestamptz</td><td>처치·구출 난이도 조건부</td><td>scene time</td><td>contact 이후.</td></tr>
+            <tr><td><code>ems.hospital_arrival_at</code></td><td>timestamptz</td><td>거리·destination 조건부</td><td>transport time</td><td>departure 이후.</td></tr>
+            <tr><td><code>ems.dispatch_type</code></td><td>coded</td><td>정상·취소·오인 등</td><td>환자 contact 여부</td><td>취소 시 환자 record 조건부.</td></tr>
+            <tr><td><code>ems.vehicle_type</code></td><td>coded</td><td>기관·지역 가용성</td><td>장비, 인력, 처치 가능성</td><td>실제 차량번호는 합성.</td></tr>
+            <tr><td><code>ems.crew_profile</code></td><td>AgentRole[]</td><td>자격·인원 분포</td><td>assessment, intervention</td><td>실제 면허번호 금지.</td></tr>
+            <tr><td><code>ems.initial_impression</code></td><td>ClinicalHypothesis</td><td>당시 관찰만 사용</td><td>destination, treatment</td><td>최종 진단 누출 금지.</td></tr>
+            <tr><td><code>ems.consciousness</code></td><td>coded scale</td><td>AVPU/GCS version</td><td>airway, vital missingness</td><td>scale 혼합 금지.</td></tr>
+            <tr><td><code>ems.treatment</code></td><td>Intervention[]</td><td>crew·protocol·상태 조건부</td><td>post-treatment vital</td><td>시작 시각·반응 필수.</td></tr>
+            <tr><td><code>ems.destination</code></td><td>Organization FK</td><td>중증도·용량·거리·수용 조건부</td><td>transport time, transfer</td><td>단순 최근접 가정 금지.</td></tr>
+            <tr><td><code>ems.handoff_at</code></td><td>timestamptz</td><td>도착·인계 지연</td><td>knowledge transfer</td><td>hospital_arrival과 구분.</td></tr>
+            <tr><td><code>ems.handoff_quality</code></td><td>ordinal/profile</td><td>정보 완전성·혼잡 조건부</td><td>lost_in_handoff Unknown</td><td>사후 outcome으로 역평가 금지.</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>활력징후·관찰 변수</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Variable ID</th><th>단위</th><th>기준값 정책</th><th>강한 연관 항목</th><th>필수 측정 맥락</th></tr></thead>
+          <tbody>
+            <tr><td><code>vital.systolic_bp</code></td><td>mmHg</td><td>연령·임신·자세·개인 baseline</td><td>DBP, MAP, shock, fluid</td><td>cuff, site, position, pre/post treatment</td></tr>
+            <tr><td><code>vital.diastolic_bp</code></td><td>mmHg</td><td>연령·임신·자세</td><td>SBP, MAP</td><td>SBP와 동일 측정 pair</td></tr>
+            <tr><td><code>vital.heart_rate</code></td><td>/min</td><td>연령·활동·발열·약물</td><td>rhythm, perfusion, temperature</td><td>method, rhythm regularity</td></tr>
+            <tr><td><code>vital.respiratory_rate</code></td><td>/min</td><td>연령·상태·산소치료</td><td>SpO₂, work of breathing</td><td>count duration, assisted breathing</td></tr>
+            <tr><td><code>vital.temperature</code></td><td>°C</td><td>부위·장비·연령·시간대</td><td>HR, infection hypothesis</td><td>body site, device</td></tr>
+            <tr><td><code>vital.spo2</code></td><td>%</td><td>산소 투여·기저질환·고도</td><td>RR, respiratory state, oxygen</td><td>device, site, signal quality, O₂ flow</td></tr>
+            <tr><td><code>vital.glucose</code></td><td>mg/dL 또는 mmol/L</td><td>식사·당뇨·연령</td><td>consciousness, insulin</td><td>specimen/method, unit normalization</td></tr>
+            <tr><td><code>observation.pain</code></td><td>scale</td><td>도구·연령·보고자</td><td>analgesia, chief complaint</td><td>NRS/FLACC 등 scale version</td></tr>
+            <tr><td><code>observation.mental_status</code></td><td>coded/score</td><td>baseline 대비 변화</td><td>GCS/AVPU, airway, glucose</td><td>assessor, sedation context</td></tr>
+            <tr><td><code>observation.work_of_breathing</code></td><td>ordinal components</td><td>연령별 관찰 기준</td><td>RR, SpO₂, respiratory support</td><td>retraction, speech, accessory muscle</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>응급실·검사·결과 변수</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Variable ID</th><th>타입</th><th>기준·분포 정책</th><th>강한 연관 항목</th><th>제약·Unknown</th></tr></thead>
+          <tbody>
+            <tr><td><code>ed.arrival_mode</code></td><td>coded</td><td>지역·중증도·접근성 조건부</td><td>KTAS, EMS link</td><td>119인 경우 구급일지 candidate link.</td></tr>
+            <tr><td><code>ed.arrival_route</code></td><td>coded</td><td>직접·전원·외래 등</td><td>prior records, transfer</td><td>내원수단과 분리.</td></tr>
+            <tr><td><code>ed.chief_complaint</code></td><td>ranked Concept[]</td><td>원문 + UMLS/local code</td><td>symptom Claims, NEDIS</td><td>최대 3개 projection은 adapter 규칙.</td></tr>
+            <tr><td><code>ed.ktas_initial</code></td><td>1–5 + process code</td><td>KTAS version·연령별 policy</td><td>vitals, complaint, area</td><td>도구 version과 assessor 필수.</td></tr>
+            <tr><td><code>ed.ktas_reassessment</code></td><td>1–5 + time</td><td>상태 변화·재평가</td><td>new observation, area</td><td>initial 덮어쓰기 금지.</td></tr>
+            <tr><td><code>ed.care_area</code></td><td>coded</td><td>KTAS·격리·용량 조건부</td><td>wait time, provider</td><td>facility-local mapping.</td></tr>
+            <tr><td><code>ed.first_physician_at</code></td><td>timestamptz</td><td>acuity·crowding 조건부</td><td>door-to-doctor</td><td>triage 이후가 보통이나 예외 허용 규칙.</td></tr>
+            <tr><td><code>ed.specialist_seen</code></td><td>boolean/event</td><td>diagnosis·severity·availability</td><td>disposition, procedure</td><td>미상과 false 구분.</td></tr>
+            <tr><td><code>order.request</code></td><td>ServiceRequest</td><td>hypothesis·protocol 조건부</td><td>result, decision</td><td>order와 performed 분리.</td></tr>
+            <tr><td><code>result.lab</code></td><td>Observation</td><td>검사별 reference range set</td><td>hypothesis, intervention</td><td>specimen, unit, flag, result time.</td></tr>
+            <tr><td><code>result.imaging</code></td><td>DiagnosticReport</td><td>modality·body site</td><td>diagnosis, procedure</td><td>preliminary/final report 분리.</td></tr>
+            <tr><td><code>diagnosis.ed</code></td><td>ranked KCD concept</td><td>주·부·의증</td><td>evidence, disposition</td><td>KCD version과 mapping confidence.</td></tr>
+            <tr><td><code>ed.disposition</code></td><td>coded</td><td>severity·response·capacity 조건부</td><td>departure, admission, transfer</td><td>귀가/전원/입원/사망/기타/미상.</td></tr>
+            <tr><td><code>ed.departure_at</code></td><td>timestamptz</td><td>LOS 분포</td><td>disposition</td><td>arrival 이후.</td></tr>
+            <tr><td><code>inpatient.admission_at</code></td><td>timestamptz?</td><td>병상·disposition 조건부</td><td>boarding time</td><td>입원일 때만.</td></tr>
+            <tr><td><code>outcome.status</code></td><td>coded</td><td>time horizon별</td><td>disease, treatment</td><td>ED outcome과 장기 outcome 분리.</td></tr>
+            <tr><td><code>followup.plan</code></td><td>CarePlan</td><td>disposition·risk 조건부</td><td>patient access, adherence</td><td>계획과 실제 수행 분리.</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>문서·생성·품질 변수</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Variable ID</th><th>타입</th><th>용도</th><th>주요 연관 항목</th><th>규칙</th></tr></thead>
+          <tbody>
+            <tr><td><code>generation.mode</code></td><td>enum</td><td>observational/coverage 등</td><td>sampling weight, audit</td><td>export에 항상 포함.</td></tr>
+            <tr><td><code>generation.seed</code></td><td>integer/string</td><td>재현</td><td>stage seed hierarchy</td><td>환자별 child seed 파생.</td></tr>
+            <tr><td><code>generation.selection_probability</code></td><td>decimal</td><td>과표집 보정</td><td>sample_weight</td><td>0보다 크고 1 이하.</td></tr>
+            <tr><td><code>generation.sample_weight</code></td><td>decimal</td><td>분석 가중치</td><td>selection probability</td><td>정의 방법 기록.</td></tr>
+            <tr><td><code>narrative.intensity_vector</code></td><td>6축 ordinal</td><td>드라마 편향 통제</td><td>acuity, ambiguity, outcome</td><td>severity와 동일하지 않음.</td></tr>
+            <tr><td><code>documentation.completeness</code></td><td>profile</td><td>현실적 누락 생성</td><td>workload, acuity, actor</td><td>의학적 사실 완전성과 분리.</td></tr>
+            <tr><td><code>documentation.style_profile</code></td><td>coded</td><td>기관·직군 문체 다양성</td><td>document type</td><td>사실 추가 권한 없음.</td></tr>
+            <tr><td><code>quality.invariant_status</code></td><td>finding[]</td><td>환자 수준 검증</td><td>repair action</td><td>critical failure는 export 차단.</td></tr>
+            <tr><td><code>quality.cohort_distance</code></td><td>metric set</td><td>분포 검증</td><td>distribution target</td><td>단일 종합점수 금지.</td></tr>
+            <tr><td><code>privacy.risk_profile</code></td><td>metric set</td><td>유사·유일성·memorization 위험</td><td>source data, export</td><td>실데이터 기반일 때 필수.</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="relations">
+        <h2>10. 관계·Association·기준값 모델</h2>
+        <h3>관계 타입을 섞지 않는다</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>관계군</th><th>관계</th><th>의미</th><th>필수 메타데이터</th></tr></thead>
+          <tbody>
+            <tr><td>구조</td><td><code>part_of</code>, <code>contains</code>, <code>occurs_in</code></td><td>계층과 소속</td><td>cardinality, inverse</td></tr>
+            <tr><td>시간</td><td><code>before</code>, <code>overlaps</code>, <code>during</code></td><td>시간 순서와 포함</td><td>precision, confidence</td></tr>
+            <tr><td>증거</td><td><code>supports</code>, <code>contradicts</code>, <code>derived_from</code></td><td>Claim의 근거 구조</td><td>weight, available_from</td></tr>
+            <tr><td>인과</td><td><code>causes</code>, <code>contributes_to</code>, <code>triggers</code></td><td>원인 또는 기여</td><td>causal status, lag, evidence grade</td></tr>
+            <tr><td>통계</td><td><code>associated_with</code>, <code>increases_probability</code></td><td>인과 미확정 연관</td><td>population, effect, support</td></tr>
+            <tr><td>행동</td><td><code>motivates</code>, <code>contraindicates</code>, <code>responded_to</code></td><td>결정과 반응</td><td>actor, time, certainty</td></tr>
+            <tr><td>문서</td><td><code>projected_into</code>, <code>coded_as</code>, <code>omitted_from</code></td><td>canonical → document lineage</td><td>adapter version, rule</td></tr>
+            <tr><td>정체성</td><td><code>same_as</code>, <code>probably_same_as</code>, <code>duplicate_of</code></td><td>레코드 연결</td><td>confidence, supporting/conflicting features</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>AssociationSpec</h3>
+        <pre><code>AssociationSpec:
+  id: assoc.smoking.copd.v1
+  source_variable: baseline.smoking_exposure
+  target_variable: baseline.condition.copd
+  relation: increases_probability
+  causal_status: supported_causal
+  direction: forward
+  conditions:
+    age_min: 40
+    cumulative_exposure_min: "policy-defined"
+  effect:
+    measure: relative_risk
+    value: null                 # 근거 없으면 억지 값 금지
+    uncertainty: unknown
+  lag_policy: years
+  source_population: korean_adults
+  evidence_grade: pending_local_review
+  valid_from: 2026-01-01
+  version: 1.0.0</code></pre>
+        <p>Association은 전역 edge가 아니다. 적용 집단, 조건, 지연, 방향, 효과 크기, 근거 수준, 예외, 버전이 붙은 객체다. 근거가 없는 경우 강도를 임의 생성하지 않고 <code>association_unknown</code>으로 남긴다.</p>
+
+        <h3>기준값의 5개 층</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>층</th><th>목적</th><th>예</th><th>사용 원칙</th></tr></thead>
+          <tbody>
+            <tr><td>Storage domain</td><td>타입이 저장 가능한 범위</td><td>SpO₂ 0–100%</td><td>DB·schema validation.</td></tr>
+            <tr><td>Plausibility guard</td><td>물리·생리적으로 의심스러운 값 감지</td><td>장비 오류·sentinel 혼입</td><td>자동 수정하지 않고 finding 생성.</td></tr>
+            <tr><td>Clinical reference</td><td>비교 기준 범위</td><td>연령·성별·부위·검사실별 범위</td><td>versioned ReferenceRangeSet.</td></tr>
+            <tr><td>Decision threshold</td><td>프로토콜·분류 규칙</td><td>KTAS·기관 alert threshold</td><td>임상 reference와 분리, 출처·버전 필수.</td></tr>
+            <tr><td>Empirical distribution</td><td>현실적 합성 표집</td><td>기관·시간대별 관찰 분포</td><td>정상 범위로 해석 금지.</td></tr>
+          </tbody>
+        </table></div>
+
+        <pre><code>ReferenceRangeSet:
+  id: rr.vital.heart_rate
+  variable_id: vital.heart_rate
+  unit: /min
+  population_conditions:
+    age_band: required
+    pregnancy_status: optional
+    activity_state: required
+    care_setting: optional
+  ranges:
+    - kind: clinical_reference
+      lower: "source-defined"
+      upper: "source-defined"
+  source_uri: "required-before-production"
+  reviewed_by: "clinical_governance_role"
+  valid_from: null
+  valid_to: null
+  version: 0.1.0-draft</code></pre>
+        <div class="callout warn"><strong>기준값 정책:</strong> 이 설계 문서에 적은 예시 범위를 운영 진단 규칙으로 사용하지 않는다. 연령, 임신, 검사실, 장비, 자세, 산소 투여 등 조건이 붙은 검토 완료 ReferenceRangeSet만 production rule로 승격한다.</div>
+      </section>
+
+      <section id="unknown">
+        <h2>11. Unknown·충돌·Open-world 모델</h2>
+        <p class="lede"><code>null</code>은 저장 기술상의 상태일 뿐 임상 의미가 아니다. 모든 중요한 결측은 이유와 시간, 해결 가능성, 영향 범위를 가진 Unknown 객체로 표현한다.</p>
+
+        <div class="table-wrap"><table>
+          <thead><tr><th>분류</th><th>Unknown kind</th><th>예시</th><th>해결 방식</th></tr></thead>
+          <tbody>
+            <tr><td>미수집</td><td><code>not_asked</code>, <code>not_observed</code>, <code>not_measured</code></td><td>응급처치 우선으로 과거력 질문 생략</td><td>후속 문진 또는 계속 미상</td></tr>
+            <tr><td>수집 실패</td><td><code>measurement_failed</code>, <code>unable_to_answer</code>, <code>patient_refused</code></td><td>격렬한 움직임으로 혈압 실패</td><td>재시도·대체 측정·거부 유지</td></tr>
+            <tr><td>시간적</td><td><code>not_yet_known</code>, <code>future_information</code>, <code>temporarily_unknown</code></td><td>초진 당시 CT 결과 미확정</td><td>결과 확정 Claim과 연결</td></tr>
+            <tr><td>구조적</td><td><code>not_applicable</code>, <code>out_of_ontology</code>, <code>coded_other</code></td><td>코드 체계에 없는 증상 표현</td><td>ontology extension queue</td></tr>
+            <tr><td>충돌</td><td><code>conflicting_reports</code>, <code>observer_uncertain</code>, <code>identity_uncertain</code></td><td>환자와 보호자의 onset 시각 불일치</td><td>후속 증거 또는 후보 병존</td></tr>
+            <tr><td>손실·보호</td><td><code>lost_in_handoff</code>, <code>redacted</code>, <code>withheld</code></td><td>인계에 약물명이 빠짐</td><td>원출처 재조회·접근 정책</td></tr>
+            <tr><td>생성기</td><td><code>model_not_generated</code>, <code>insufficient_support</code>, <code>out_of_distribution</code></td><td>희귀 결합 분포 근거 부족</td><td>fallback 또는 생성 중단</td></tr>
+          </tbody>
+        </table></div>
+
+        <pre><code>{
+  "unknown_id": "unk_01J...",
+  "target": {"entity_id": "epi_01J...", "variable_id": "episode.onset_time"},
+  "kind": "conflicting_reports",
+  "introduced_at": "2026-07-14T10:16:00+09:00",
+  "candidates": [
+    {"value": "09:00", "source_claim_id": "clm_patient", "weight": 0.4},
+    {"value": "09:30", "source_claim_id": "clm_caregiver", "weight": 0.6}
+  ],
+  "impact": {
+    "severity": "high",
+    "affected_rules": ["eligibility.time_window"],
+    "affected_projections": ["ambulance", "initial_note"]
+  },
+  "status": "unresolved"
+}</code></pre>
+
+        <h3>Open-world와 Closed-world</h3>
+        <ul>
+          <li>증상, 과거력, 약물, 진단은 기본적으로 open-world다. 기록이 없다고 음성이 아니다.</li>
+          <li>완결성이 검증된 체크리스트와 필수 폼 섹션만 제한적으로 closed-world를 적용한다.</li>
+          <li>NEDIS의 <code>-1</code>, <code>999</code>, <code>11111111</code> 같은 sentinel은 canonical store에 넣지 않는다. adapter가 Unknown 의미를 변환한다.</li>
+          <li>충돌은 consistency pass로 한 값을 고르는 문제가 아니다. 복수 Claim과 충돌 관계를 유지한 뒤, 문서별로 당시 채택된 판단을 투영한다.</li>
+        </ul>
+
+        <h3>Unknown Registry를 통한 온톨로지 진화</h3>
+        <div class="flow">
+          <div class="step">Unknown 발견</div><div class="arrow">→</div>
+          <div class="step">반복 패턴 군집</div><div class="arrow">→</div>
+          <div class="step">기존 개념 매핑 검토</div><div class="arrow">→</div>
+          <div class="step">새 변수·관계 후보</div><div class="arrow">→</div>
+          <div class="step">임상·데이터 승인</div><div class="arrow">→</div>
+          <div class="step">온톨로지 버전 승격</div>
+        </div>
+      </section>
+
+      <section id="algorithms">
+        <h2>12. 생성·그래프·보정 알고리즘 상세</h2>
+        <h3>12.1 Cohort-first sampler</h3>
+        <pre><code>function generate_cohort(contract):
+    manifest = freeze_versions_and_seed(contract)
+    world = simulate_world_timeline(contract.setting, contract.period)
+    targets = load_distribution_targets(contract.mode, contract.population)
+
+    blueprints = joint_sample(
+        n = contract.population_size,
+        conditional_dag = targets.conditional_dag,
+        shared_context = world.context_events,
+        soft_constraints = targets.tolerances,
+        seed = manifest.seed.child("blueprints")
+    )
+
+    blueprint_audit = audit_blueprints(blueprints, targets)
+    blueprints = resample_minimal_set(blueprints, blueprint_audit)
+
+    chronicles = parallel_map(forward_simulate, blueprints)
+    documents = project_all(chronicles, contract.document_profiles)
+    final_audit = audit_all(chronicles, documents, targets)
+
+    while final_audit.has_repairable_critical_findings:
+        plan = choose_min_cost_repair(final_audit)
+        apply_dependency_scoped_regeneration(plan)
+        final_audit = audit_impacted_scope(plan)
+
+    return release_if_gates_pass(manifest, chronicles, documents, final_audit)</code></pre>
+
+        <h4>표집 순서</h4>
+        <ol>
+          <li>기관·기간·계절·시간대·용량을 포함한 world state를 먼저 생성한다.</li>
+          <li>연령·성별·지역 같은 demographic strata를 표집한다.</li>
+          <li>baseline condition과 persona를 조건부로 표집한다.</li>
+          <li>급성 episode family와 latent severity를 표집한다.</li>
+          <li>arrival mode, KTAS, intervention density, disposition을 joint model로 표집한다.</li>
+          <li>별도로 narrative intensity vector와 missingness profile을 부여한다.</li>
+          <li>주변 분포가 아니라 조건부·결합 분포까지 audit한다.</li>
+        </ol>
+
+        <h4>작은 코호트의 자연 변동</h4>
+        <p>확률 1% 사건은 100명에서 기대값이 1명이지만 0명일 확률도 약 36.6%다. observational 모드에서는 정확한 quota보다 binomial/Dirichlet-multinomial 기반 stochastic envelope를 사용한다. 반대로 coverage 모드에서는 최소 1건을 보장하되 실제 유병률로 오해되지 않도록 가중치를 기록한다.</p>
+
+        <h3>12.2 임상 전방 시뮬레이터</h3>
+        <pre><code>latent_state(t0)
+  → pathophysiologic transition
+  → symptom manifestation
+  → patient/caregiver perception
+  → care-seeking decision
+  → observation process
+  → clinician knowledge update
+  → intervention decision
+  → treatment-modified state
+  → new observation
+  → disposition</code></pre>
+        <ul>
+          <li><strong>Latent state:</strong> 생성기의 실제 상태. 문서 생성기에서 숨긴다.</li>
+          <li><strong>Manifestation:</strong> 상태가 모든 증상을 완전하게 드러내지 않도록 확률적 관찰 가능성을 적용한다.</li>
+          <li><strong>Observation process:</strong> 질문·측정 여부, 측정 성공, 장비 오차, 기록 여부를 별도 생성한다.</li>
+          <li><strong>Treatment confounding:</strong> 수액·산소·해열제 이후 관찰은 처치 전 상태를 대표하지 않는다.</li>
+          <li><strong>Knowledge update:</strong> 새로운 evidence가 들어올 때 hypothesis rank가 바뀐다.</li>
+        </ul>
+
+        <h3>12.3 시간 그래프 알고리즘</h3>
+        <ol>
+          <li>모든 event를 TemporalExtent와 clock source로 정규화한다.</li>
+          <li>확정된 <code>before</code> edge로 DAG를 구성한다.</li>
+          <li>Kahn topological sort로 cycle을 검사한다.</li>
+          <li>구간 시간이 겹치는 경우 <code>overlaps</code>로 보존하고 임의 순서를 만들지 않는다.</li>
+          <li>문서 time과 event effective time, recorded time을 분리한다.</li>
+          <li>장비·서버 시계 offset이 알려지면 정규화값과 원시값을 함께 보존한다.</li>
+        </ol>
+
+        <h3>12.4 Knowledge frontier</h3>
+        <pre><code>available_claims(document, authored_at, author) =
+  claims
+    where claim.asserted_at &lt;= authored_at
+      and evidence.available_from &lt;= authored_at
+      and knowledge_graph.has_path(evidence, author_or_team)
+      and access_policy.allows(author, claim)
+      and claim.status_at(authored_at) != "refuted"</code></pre>
+        <p>구급일지에는 병원 도착 후 확정된 검사·진단이 들어갈 수 없다. 초진기록지에는 이후 입원 경과나 최종 진단이 들어갈 수 없다. 단, “나중에 추가 기재한 addendum”은 별도 document version과 recorded time으로 표현한다.</p>
+
+        <h3>12.5 Claim consolidation</h3>
+        <ol>
+          <li>동일 subject–predicate–time window의 Claim 후보를 검색한다.</li>
+          <li>출처 독립성, measurement quality, 시간 근접성, 직접성으로 evidence weight를 계산한다.</li>
+          <li>합의 가능한 값은 consolidated Claim을 만들되 원본 Claim을 유지한다.</li>
+          <li>임계 차이를 넘는 값은 <code>conflicts_with</code>와 Unknown을 생성한다.</li>
+          <li>후속 evidence가 들어오면 새 consolidated Claim이 이전 Claim을 supersede한다.</li>
+        </ol>
+
+        <h3>12.6 Targeted regeneration</h3>
+        <p>분포를 맞추기 위해 leaf 값을 직접 바꾸지 않는다. 변경할 root variable과 그 downstream dependency closure를 계산한다.</p>
+        <pre><code>repair_loss =
+    w1 * marginal_distance
+  + w2 * joint_distance
+  + w3 * temporal_distance
+  + w4 * missingness_distance
+  + w5 * duplication_penalty
+  + λ  * regeneration_cost
+
+candidate repair:
+  root = blueprint.acuity
+  closure = {
+    clinical_state, observations, decisions,
+    interventions, disposition, document_projections
+  }
+</code></pre>
+        <p>후보 환자별 예상 개선량과 재생성 비용을 비교해 최소 집합을 선택한다. 구현은 초기에는 greedy selection으로 시작하고, 복잡한 quota 조합이 필요할 때만 min-cost flow 또는 mixed-integer optimization을 도입한다.</p>
+
+        <h3>12.7 Identity linkage</h3>
+        <p>EMS와 응급실 기록 연결은 확정 ID가 없을 수 있다. 시간, 목적지, 연령대, 성별, 증상, 이송 기관을 feature로 사용하되 확정 관계 대신 confidence가 있는 후보 edge를 만든다.</p>
+        <pre><code>link_score = calibrated_model(
+  arrival_time_delta,
+  destination_match,
+  age_band_match,
+  sex_match,
+  complaint_similarity,
+  ambulance_record_hint
+)
+
+score ≥ T_confirm  → same_as
+T_candidate ≤ score &lt; T_confirm → probably_same_as
+score &lt; T_candidate → no edge</code></pre>
+      </section>
+
+      <section id="llm">
+        <h2>13. LLM 오케스트레이션 상세</h2>
+        <p class="lede">LLM은 확률 분포 엔진이나 진실 저장소가 아니다. 각 단계에서 허용된 입력과 출력 schema, 수정 가능한 dependency scope를 가진 변환기다.</p>
+
+        <h3>단계별 LLM 계약</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Stage</th><th>LLM 역할</th><th>입력</th><th>출력</th><th>금지</th></tr></thead>
+          <tbody>
+            <tr><td>L0. 카탈로그 보조</td><td>근거 문서에서 후보 개념·규칙 추출</td><td>승인된 reference text</td><td>검토 대기 후보</td><td>자동 production 승격</td></tr>
+            <tr><td>L1. Blueprint enrichment</td><td>구조화된 사회·행동 맥락 후보</td><td>고정 demographic·clinical bounds</td><td>schema-constrained hints</td><td>질환·중증도·outcome 변경</td></tr>
+            <tr><td>L2. Event realization</td><td>환자·보호자 진술, 상황 묘사</td><td>현재 event와 knowledge state</td><td>Claim·Evidence 후보</td><td>미래 검사·진단 참조</td></tr>
+            <tr><td>L3. Clinical hypothesis assist</td><td>감별 후보 제안</td><td>당시 available evidence</td><td>ranked candidate + rationale IDs</td><td>결정적 최종 진단 판정</td></tr>
+            <tr><td>L4. Document narration</td><td>projection payload 문장화</td><td>필드별 approved facts</td><td>문서 JSON</td><td>새 임상 사실 추가</td></tr>
+            <tr><td>L5. Repair</td><td>검증 오류를 제한 범위에서 수정</td><td>원출력, finding, allowed paths</td><td>JSON Patch</td><td>허용 범위 밖 변경</td></tr>
+            <tr><td>L6. Qualitative review</td><td>부자연스러운 문체·중복 후보 탐지</td><td>익명화된 artifacts</td><td>finding only</td><td>자동 통과 판정의 단독 근거</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>Prompt envelope</h3>
+        <pre><code>{
+  "task": "project_initial_note",
+  "contract_version": "1.0.0",
+  "allowed_sources": ["clm_...", "obs_...", "unk_..."],
+  "knowledge_frontier": "2026-07-14T10:40:00+09:00",
+  "immutable_fields": ["patient_id", "encounter_id", "authored_at"],
+  "allowed_output_paths": ["$.hpi", "$.assessment", "$.plan"],
+  "output_schema_id": "schema.document.initial_note.v1",
+  "style_profile_id": "style.ed_physician.concise_ko.v1",
+  "prohibitions": [
+    "do_not_add_new_diagnosis",
+    "do_not_invent_test_results",
+    "do_not_use_future_claims"
+  ]
+}</code></pre>
+
+        <h3>구조화 출력과 검증</h3>
+        <ol>
+          <li>LLM 응답은 문장 덩어리가 아니라 versioned JSON Schema를 따라야 한다.</li>
+          <li>파싱 실패 시 정규식으로 큰 JSON 블록을 추정하지 않고 provider structured output 또는 repair prompt를 사용한다.</li>
+          <li>schema validation, source ID validation, knowledge frontier, forbidden concept 검사를 차례로 수행한다.</li>
+          <li>실패 finding을 JSON Pointer와 함께 repair stage로 보낸다.</li>
+          <li>최대 재시도 후에도 실패하면 fallback template 또는 generation failure로 명시한다. 조용히 임상 내용을 만들어내지 않는다.</li>
+        </ol>
+
+        <h3>재시도 정책</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>오류</th><th>재시도</th><th>조치</th></tr></thead>
+          <tbody>
+            <tr><td>timeout, 429, 일시적 5xx</td><td>예</td><td>지수 backoff + jitter, idempotency key 유지</td></tr>
+            <tr><td>JSON schema 위반</td><td>제한적</td><td>temperature 상승보다 finding 기반 repair</td></tr>
+            <tr><td>knowledge leakage</td><td>제한적</td><td>누출 source 제거, projection stage 전체 재실행</td></tr>
+            <tr><td>clinical invariant 위반</td><td>국소 또는 중단</td><td>LLM leaf 수정 금지, Chronicle root 재생성</td></tr>
+            <tr><td>authentication·permission·잘못된 요청</td><td>아니오</td><td>즉시 실패, secret는 로그에 남기지 않음</td></tr>
+            <tr><td>safety block</td><td>정책별 제한</td><td>민감정보·프롬프트 구성 점검. 의미를 우회하지 않음.</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>LM Studio 로컬 연동</h3>
+        <ul>
+          <li>서버 주소는 root, <code>/v1</code>, <code>/api/v1</code> 입력을 받아 내부에서 root로 정규화한다.</li>
+          <li>생성은 LM Studio native REST <code>/api/v1/chat</code>을 기본 사용한다.</li>
+          <li><code>max_output_tokens</code>와 <code>context_length</code>를 요청에 명시한다.</li>
+          <li><code>/api/v1/models</code>로 loaded instance와 context length를 확인한다.</li>
+          <li>명시적 preload가 필요할 때만 <code>/api/v1/models/load</code>에 <code>context_length</code>를 지정한다.</li>
+          <li>API key와 원격 provider secret는 시스템 환경변수를 우선하고, untracked <code>.env.local</code>만 fallback으로 사용한다.</li>
+        </ul>
+
+        <h3>재현 manifest</h3>
+        <pre><code>GenerationManifest:
+  code_commit: git-sha
+  schema_bundle: 1.0.0
+  catalog_bundle: 1.0.0
+  rule_bundle: 1.0.0
+  distribution_bundle: institution-2026Q2-v1
+  prompt_bundle: ko-emergency-v1.3
+  provider: lmstudio
+  model_instance: model-id-and-load-config
+  context_length: 65536
+  max_output_tokens: 8192
+  seed_root: 20260714
+  stages:
+    blueprint_seed: derived
+    chronicle_seed: derived
+    document_seed: derived</code></pre>
+
+        <h3>운영 가능성 판정과 단계적 생성 정책</h3>
+        <p>이 설계는 교육·시뮬레이션용 합성 데이터 서비스로는 운영 가능하다. 실제 환자 진료를 자동 결정하거나 법정 원본 기록을 무인 대체하는 제품으로는 승인되지 않는다. 운영 전제는 합성/실데이터 환경 분리, 모든 산출물의 <code>synthetic=true</code> 표식과 watermark, 임상 검토자 승인 경계, 모델·카탈로그·프롬프트 버전 고정, 개인정보·라이선스·보안 점검이다.</p>
+        <p>대량 생성은 2-pass를 기본값으로 한다. Pass 1은 결정론적 Blueprint와 Chronicle 골격을 생성하고 코호트 분포·조건부 연관·결측률·극적 강도·중복 motif를 감사한다. Pass 2는 부족한 strata만 선택적으로 재생성한 뒤 승인된 Claim을 LLM으로 문장화한다. 이 방식은 100명 모두가 극적인 사례가 되는 mode collapse를 줄이면서 개별 기록의 풍부함을 유지한다.</p>
+        <div class="callout"><strong>운영 gate:</strong> 분포 감사 실패 시 문서화를 진행하지 않고 Blueprint 단계로 되돌린다. LLM 장애 시 템플릿 기반 구조화 출력으로 degrade하며 임상 사실을 새로 추론하지 않는다.</div>
+      </section>
+
+      <section id="documents">
+        <h2>14. 초진기록지·구급활동일지·NEDIS 투영</h2>
+        <p class="lede">각 문서는 같은 Chronicle을 보지만, 작성 시점·작성자·목적·법정 양식·코드 체계가 다르다. 문서 adapter는 무엇을 보이고 무엇을 숨길지를 선언한다.</p>
+
+        <h3>Projection 공통 알고리즘</h3>
+        <pre><code>function project(document_type, encounter, authored_at, author):
+    policy = load_projection_policy(document_type, version)
+    frontier = build_knowledge_frontier(author, authored_at)
+    sources = query_chronicle(encounter, frontier, policy.allowed_relations)
+    fields = deterministic_map(sources, policy.field_rules)
+    fields = encode_unknowns(fields, policy.blank_and_sentinel_rules)
+    narrative = llm_render_only(policy.narrative_sections, fields)
+    validate_projection(fields, narrative, policy)
+    persist_document_and_field_lineage()
+</code></pre>
+
+        <h3>119 구급활동일지 profile</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>섹션</th><th>Canonical source</th><th>핵심 규칙</th></tr></thead>
+          <tbody>
+            <tr><td>출동 정보</td><td>EMS encounter, vehicle, dispatch events</td><td>신고·출동·현장도착·환자접촉·현장출발·병원도착·귀소 시간 순서 검증</td></tr>
+            <tr><td>환자 인적사항</td><td>synthetic identity, age_at_event, related person</td><td>실존 식별자 금지. 미상과 확인불가 구분.</td></tr>
+            <tr><td>발생 장소·출동 유형</td><td>scene Location, dispatch_type</td><td>복수·택일 cardinality를 양식별로 적용.</td></tr>
+            <tr><td>환자 증상</td><td>현장 시점 환자·보호자 Claim</td><td>최종 진단으로 증상을 역작성하지 않음.</td></tr>
+            <tr><td>환자 평가</td><td>EMS Observation, initial impression</td><td>측정 시각·방법·실패 사유 보존.</td></tr>
+            <tr><td>응급처치</td><td>EMS Intervention</td><td>수행자, 시작 시각, 반응, 의료지도 연결.</td></tr>
+            <tr><td>이송·인계</td><td>destination Decision, handoff Communication</td><td>병원 수용·전원 사유와 인계 시점 표현.</td></tr>
+            <tr><td>서명·보관</td><td>Document attestation</td><td>합성 문서는 실제 서명처럼 위조하지 않고 simulation attestation으로 표시.</td></tr>
+          </tbody>
+        </table></div>
+        <p class="small">공식 별지 제5호서식과 시행규칙 제18조는 구현 시 form version으로 고정해 관리한다. 양식 변경을 adapter migration으로 처리한다.</p>
+
+        <h3>응급실 초진기록지 profile</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>섹션</th><th>Canonical source</th><th>핵심 규칙</th></tr></thead>
+          <tbody>
+            <tr><td>인적·내원 정보</td><td>Patient, Encounter</td><td>도착 시각·수단·경로·정보 제공자 표시.</td></tr>
+            <tr><td>주호소</td><td>ranked chief complaint Claims</td><td>환자 원문과 정규화 concept를 함께 보존.</td></tr>
+            <tr><td>현병력</td><td>onset·course·self-treatment·EMS events</td><td>작성 시점에 알려진 순서만 서술.</td></tr>
+            <tr><td>과거력·약물·알레르기</td><td>Baseline Claims</td><td>확인자와 completeness를 표시. 미상은 “없음”으로 쓰지 않음.</td></tr>
+            <tr><td>활력·진찰</td><td>ED Observation</td><td>EMS 처치 후 상태임을 보존. 측정 맥락 연결.</td></tr>
+            <tr><td>평가·감별</td><td>ClinicalHypothesis</td><td>의증과 확정 진단 분리. rationale source ID 유지.</td></tr>
+            <tr><td>계획</td><td>Decision, ServiceRequest, Intervention intent</td><td>실제 수행·결과와 분리.</td></tr>
+            <tr><td>작성·서명</td><td>Agent, authored_at, attestation</td><td>추가기재는 원본을 보존한 새 version.</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>NEDIS 4.0 adapter</h3>
+        <p>NEDIS는 canonical schema가 아니라 export profile이다. 핵심 EMIHPTMI 외에 검사·처치·수술, 퇴실 진단, 전문의 진료, 입원 후 처치·진단 테이블을 encounter 결과에 따라 생성한다.</p>
+        <div class="table-wrap"><table>
+          <caption>핵심 27개 필드 mapping</caption>
+          <thead><tr><th>표본 변수</th><th>NEDIS 4.0</th><th>Canonical source</th><th>변환 규칙</th></tr></thead>
+          <tbody>
+            <tr><td><code>index_key</code></td><td>복합키</td><td>organization + synthetic MRN + arrival</td><td>export 전용 결정적 키</td></tr>
+            <tr><td><code>emorg_cd</code></td><td><code>ptmiemcd</code></td><td>Organization.external_code</td><td>8자리 profile validation</td></tr>
+            <tr><td><code>pat_reg_no</code></td><td><code>ptmiidno</code></td><td>Encounter.synthetic_local_id</td><td>실제 MRN 금지, 12자리 adapter ID</td></tr>
+            <tr><td><code>vst_dt</code></td><td><code>ptmiindt</code></td><td>Encounter.arrival</td><td>YYYYMMDD</td></tr>
+            <tr><td><code>vst_tm</code></td><td><code>ptmiintm</code></td><td>Encounter.arrival</td><td>HH24MM</td></tr>
+            <tr><td><code>pat_age_gr</code></td><td><code>ptmibrtd</code> 변환</td><td>age_at_event</td><td>profile age-group mapping</td></tr>
+            <tr><td><code>pat_sex</code></td><td><code>ptmisexx</code></td><td>sex_at_birth</td><td>code mapping, unknown policy</td></tr>
+            <tr><td><code>pat_do_cd</code></td><td><code>ptmizipc</code></td><td>residence_region</td><td>시도 코드 추출</td></tr>
+            <tr><td><code>vst_meth</code></td><td><code>ptmiinmn</code></td><td>ed.arrival_mode</td><td>2자리 code set</td></tr>
+            <tr><td><code>ktas_fstu</code></td><td><code>ptmikts1</code></td><td>ed.ktas_initial</td><td>1–5, assessor/time completeness</td></tr>
+            <tr><td><code>ktas01</code></td><td><code>ptmikpr1</code></td><td>KTAS process concept</td><td>6자리 code set</td></tr>
+            <tr><td><code>msypt</code></td><td><code>ptmimnsy</code></td><td>chief complaint #1</td><td>UMLS/local concept mapping</td></tr>
+            <tr><td><code>main_trt_p</code></td><td><code>ptmidept</code></td><td>main care department</td><td>2자리 code set</td></tr>
+            <tr><td><code>emtrt_rust</code></td><td><code>ptmiemrt</code></td><td>ed.disposition</td><td>귀가·전원·입원·사망·기타·미상</td></tr>
+            <tr><td><code>otrm_dt/tm</code></td><td><code>ptmiotdt/ptmiottm</code></td><td>ed.departure_at</td><td>날짜·시간 분리</td></tr>
+            <tr><td><code>ocur_dt/tm</code></td><td><code>ptmiakdt/ptmiaktm</code></td><td>episode.onset_time</td><td>둘 다 미상일 때 adapter sentinel</td></tr>
+            <tr><td><code>vst_sbp</code></td><td><code>ptmihibp</code></td><td>arrival BP observation</td><td>canonical Unknown → -1/999 policy</td></tr>
+            <tr><td><code>vst_dbp</code></td><td><code>ptmilobp</code></td><td>arrival BP observation</td><td>동일 measurement pair</td></tr>
+            <tr><td><code>vst_per_pu</code></td><td><code>ptmipuls</code></td><td>arrival HR</td><td>측정불가·미입력 구분 후 encoding</td></tr>
+            <tr><td><code>vst_per_br</code></td><td><code>ptmibrth</code></td><td>arrival RR</td><td>측정 맥락은 lineage에 보존</td></tr>
+            <tr><td><code>vst_bdht</code></td><td><code>ptmibdht</code></td><td>arrival temperature</td><td>소수 1자리, site는 lineage</td></tr>
+            <tr><td><code>vst_oxy</code></td><td><code>ptmivoxs</code></td><td>arrival SpO₂</td><td>산소 투여 context 보존</td></tr>
+            <tr><td><code>inpat_dt/tm</code></td><td><code>ptmihsdt/ptmihstm</code></td><td>inpatient.admission_at</td><td>입원 disposition일 때만</td></tr>
+            <tr><td><code>inpat_rust</code></td><td><code>ptmidcrt</code></td><td>inpatient outcome</td><td>퇴원 시점 발생</td></tr>
+          </tbody>
+        </table></div>
+
+        <h4>NEDIS 조건부 테이블</h4>
+        <ul>
+          <li><code>EMIHPTMI</code>: 응급환자 진료내역. 복합키는 기관코드, 의무기록번호, 내원일자, 내원시간.</li>
+          <li><code>EMIHTRPT</code>: 응급실 내 검사·처치·수술. 수행된 행위만 시작 시각과 함께 투영.</li>
+          <li><code>EMIHDGOT</code>: 퇴실 진단. KCD 버전, 주진단·부진단·의증 구분.</li>
+          <li><code>EMIHSDMD</code>: 전문의 진료내역. 실제 specialist encounter가 있을 때만.</li>
+          <li><code>EMIHOPPT</code>, <code>EMIHDGDC</code>: 응급실 경유 입원 후 처치·퇴원 진단. 입원 후 퇴원 event가 있을 때만.</li>
+        </ul>
+
+        <pre><code>DocumentFieldLineage example:
+  document: nedis.EMIHPTMI
+  field_path: $.ptmivoxs
+  source_ids:
+    - obs_spo2_arrival_01
+    - intervention_oxygen_ems_01
+  projection_rule: nedis.v4.arrival_spo2.v1
+  transform:
+    value: round_to_integer
+    missing: unknown_to_numeric_sentinel
+  warnings:
+    - "measurement occurred while oxygen was being administered"</code></pre>
+      </section>
+
+      <section id="validation">
+        <h2>15. 검증·품질·프라이버시</h2>
+        <p class="lede">한 개의 realism score는 금지한다. 구조, 개별 임상, 시간, 지식, 코호트, 문서, 프라이버시를 독립된 gate로 평가한다.</p>
+
+        <h3>검증 계층</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>계층</th><th>검사</th><th>대표 방법</th><th>실패 처리</th></tr></thead>
+          <tbody>
+            <tr><td>Schema</td><td>타입, required, enum, unit</td><td>JSON Schema/Pydantic/DB constraint</td><td>stage 실패</td></tr>
+            <tr><td>Referential</td><td>FK, cardinality, edge domain/range</td><td>DB·graph invariant</td><td>export 차단</td></tr>
+            <tr><td>Temporal</td><td>순서, cycle, interval, clock</td><td>DAG sort, duration policy</td><td>root event 재생성</td></tr>
+            <tr><td>Clinical</td><td>상태·관찰·처치·반응의 개연성</td><td>질환 module rules + clinician review</td><td>Chronicle repair</td></tr>
+            <tr><td>Knowledge</td><td>미래 정보 누출, 근거 가용성</td><td>knowledge frontier query</td><td>critical, 문서 폐기</td></tr>
+            <tr><td>Document</td><td>필드 completeness, lineage, code</td><td>adapter contract test</td><td>projection 재실행</td></tr>
+            <tr><td>Cohort</td><td>분포, 관계, 시간, 결측, 다양성</td><td>통계 metric suite</td><td>선택 재생성</td></tr>
+            <tr><td>Privacy</td><td>유사성, 유일성, memorization</td><td>nearest-neighbor, membership tests, policy</td><td>release 차단</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>핵심 clinical invariants</h3>
+        <ul class="dense">
+          <li>환자 접촉·측정·처치는 해당 encounter 범위 안에 있어야 한다.</li>
+          <li>처치 반응 Observation은 처치 시작 이후여야 한다.</li>
+          <li>SBP와 DBP는 동일 measurement context에서 생성되며 일반적으로 DBP가 SBP를 초과하면 critical finding이다.</li>
+          <li>입원 시각은 ED 도착 이후이며 입원 disposition과 함께 존재해야 한다.</li>
+          <li>귀가 encounter에 입원 후 결과를 생성하지 않는다.</li>
+          <li>검사 결과는 order 없이도 외부검사로 존재할 수 있으나 source encounter가 필요하다.</li>
+          <li>확정 진단은 충분한 evidence 또는 명시적 clinical assertion을 요구한다.</li>
+          <li>음성 소견은 질문·관찰 수행 근거가 있어야 한다.</li>
+          <li>NEDIS 조건부 필드는 질병/손상, disposition, arrival mode 조건을 따른다.</li>
+        </ul>
+
+        <h3>코호트 metric suite</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>차원</th><th>대표 지표</th><th>보는 문제</th></tr></thead>
+          <tbody>
+            <tr><td>범주 주변 분포</td><td>Total Variation, Jensen–Shannon, χ² descriptive</td><td>KTAS·disposition·질환 비율</td></tr>
+            <tr><td>연속 분포</td><td>Wasserstein, KS statistic, quantile error</td><td>활력·LOS·시간 간격</td></tr>
+            <tr><td>결합 분포</td><td>multivariate Hellinger, copula distance</td><td>각 변수는 맞지만 조합이 틀리는 문제</td></tr>
+            <tr><td>조건부 관계</td><td>conditional prevalence, odds/risk delta</td><td>연령별 질환, KTAS별 입원</td></tr>
+            <tr><td>상관 구조</td><td>Pearson/Spearman delta, covariance error</td><td>vital·severity 관계</td></tr>
+            <tr><td>시간 구조</td><td>interval distribution, autocorrelation, trajectory distance</td><td>도착·측정·처치 시계열</td></tr>
+            <tr><td>결측</td><td>missing rate by condition, pattern distance</td><td>MNAR 현실성</td></tr>
+            <tr><td>그래프</td><td>motif frequency, degree distribution, orphan rate</td><td>event topology와 반복 구조</td></tr>
+            <tr><td>다양성</td><td>blueprint hash duplication, semantic cluster concentration</td><td>표현만 다른 동일 사례</td></tr>
+            <tr><td>드라마 편향</td><td>intensity vector distribution, extreme co-occurrence</td><td>100명 모두 극적인 문제</td></tr>
+          </tbody>
+        </table></div>
+        <p>단변량 유사성만으로 시간 궤적과 공분산 보존을 판단할 수 없다. metric은 target source와 표본 크기에 맞는 bootstrap confidence interval 또는 stochastic envelope와 함께 판정한다.</p>
+
+        <h3>Privacy release gate</h3>
+        <ul>
+          <li>공개 통계·규칙만 사용하는 fully synthetic 모드와 실제 record-level data를 학습하는 모드를 분리한다.</li>
+          <li>실데이터 기반 패턴 학습 환경은 합성 결과도 release 전까지 개인정보 취급 수준으로 보호한다.</li>
+          <li>직접식별자는 생성 단계부터 합성하고 실제 이름·전화·주소·면허번호를 prompt에 넣지 않는다.</li>
+          <li>희귀한 속성 조합과 시간·지역 topology가 재식별 신호가 될 수 있으므로 direct identifier 제거만으로 충분하지 않다.</li>
+          <li>실제 source row와의 nearest-neighbor distance, exact/near duplicate, membership inference 위험을 평가한다.</li>
+          <li>외부 배포본은 목적에 맞는 필드 최소화, 일반화, suppression, sampling 정책을 적용한다.</li>
+          <li>법적 적합성은 제품 기능이 아니라 별도 governance 승인 사항이다. 이 문서는 법률 자문을 대체하지 않는다.</li>
+        </ul>
+
+        <h3>Human review</h3>
+        <ul>
+          <li>임상의 blind review: 빈도 기반 층화 표본과 극단·충돌 표본을 함께 평가.</li>
+          <li>문서 실무자 review: 초진·구급·NEDIS 양식 적합성.</li>
+          <li>데이터 review: target source, association, 결측, code mapping.</li>
+          <li>LLM judge는 보조 finding만 생성하며 단독 승인자가 될 수 없다.</li>
+        </ul>
+      </section>
+
+      <section id="api">
+        <h2>16. API·Job·운영 설계</h2>
+        <h3>주요 API</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Method</th><th>Endpoint</th><th>역할</th></tr></thead>
+          <tbody>
+            <tr><td>POST</td><td><code>/v1/cohort-runs</code></td><td>Generation Contract 생성·버전 고정</td></tr>
+            <tr><td>POST</td><td><code>/v1/cohort-runs/{id}/plan</code></td><td>World·target·Blueprint 계획</td></tr>
+            <tr><td>POST</td><td><code>/v1/cohort-runs/{id}/generate</code></td><td>승인 Blueprint 상세 생성 job</td></tr>
+            <tr><td>GET</td><td><code>/v1/cohort-runs/{id}/audit</code></td><td>코호트 metric과 finding 조회</td></tr>
+            <tr><td>POST</td><td><code>/v1/cohort-runs/{id}/repair</code></td><td>승인된 repair plan 실행</td></tr>
+            <tr><td>GET</td><td><code>/v1/patients/{id}/chronicle</code></td><td>timeline·Claim·Unknown 조회</td></tr>
+            <tr><td>POST</td><td><code>/v1/patients/{id}/project</code></td><td>문서 profile 투영</td></tr>
+            <tr><td>GET</td><td><code>/v1/documents/{id}/lineage</code></td><td>필드 source·rule 추적</td></tr>
+            <tr><td>GET</td><td><code>/v1/catalogs/{type}</code></td><td>변수·개념·관계·기준값 version 조회</td></tr>
+            <tr><td>POST</td><td><code>/v1/exports</code></td><td>NEDIS/FHIR/JSONL export job</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>Job 상태 머신</h3>
+        <pre><code>PENDING → LEASED → RUNNING → VALIDATING → SUCCEEDED
+    │         │          │          │
+    └→ CANCELLED         ├→ RETRY_WAIT
+                         └→ FAILED
+
+필수 필드:
+  idempotency_key, stage, attempt, max_attempts,
+  lease_owner, lease_expires_at, input_hash,
+  output_artifact_id, error_class, next_retry_at</code></pre>
+
+        <h3>관찰 가능성</h3>
+        <ul>
+          <li>Trace: cohort run → patient → stage → model call → artifact → finding → repair.</li>
+          <li>Metric: stage latency, model error, schema failure, invariant failure, regeneration rate, cost/token, cohort distance.</li>
+          <li>Log: structured event만 기록. prompt 원문과 secret, 실제 개인정보는 기본 로그에서 제외.</li>
+          <li>Artifact hash: input/output SHA-256으로 동일 입력 재사용과 변조 탐지.</li>
+          <li>Budget: 환자당·코호트당 최대 token, 재시도, wall time을 계약에 포함.</li>
+        </ul>
+
+        <h3>접근제어</h3>
+        <p>온톨로지 관계를 접근 경로로 사용한다. 예를 들어 reviewer는 할당된 CohortRun과 그 아래 artifact만, clinical reviewer는 narrative와 임상 Claim을, privacy reviewer는 source similarity metric을 볼 수 있도록 ReBAC를 구성한다. 합성 데이터라도 실제 source를 사용한 run과 fully synthetic run의 권한을 분리한다.</p>
+      </section>
+
+      <section id="roadmap">
+        <h2>17. 전체 개발 로드맵</h2>
+        <p class="lede">권장 기준은 16주 MVP다. 임상 콘텐츠 승인 속도와 NEDIS 양식 검토에 따라 일정이 늘어날 수 있다. 각 단계는 다음 단계의 진입 gate를 가진다.</p>
+
+        <div class="table-wrap"><table>
+          <thead><tr><th>기간</th><th>Phase</th><th>핵심 산출물</th><th>Exit gate</th></tr></thead>
+          <tbody>
+            <tr><td>1–2주</td><td>0. Governance &amp; Contract</td><td>use mode, source inventory, licensing, initial disease scope, target metrics, RFC list</td><td>임상·데이터·제품 책임자 승인</td></tr>
+            <tr><td>3–4주</td><td>1. Domain Kernel</td><td>Patient/Episode/Event/Claim/Unknown schema, relation catalog, migrations</td><td>contract/property tests, append-only·supersede 검증</td></tr>
+            <tr><td>5–7주</td><td>2. Single-patient Simulator</td><td>Blueprint, temporal engine, observation process, 3개 대표 disease modules</td><td>golden patient 30건 critical violation 0</td></tr>
+            <tr><td>8–10주</td><td>3. Document Projection</td><td>초진·구급·NEDIS adapters, field lineage, code mapping</td><td>round-trip/knowledge leakage/conditional field tests 통과</td></tr>
+            <tr><td>11–13주</td><td>4. Cohort Engine</td><td>world model, joint sampler, target ledger, cohort metrics, drama/missingness control</td><td>100·1,000명 benchmark tolerance 통과</td></tr>
+            <tr><td>14–15주</td><td>5. Repair &amp; Review</td><td>dependency closure, selective regeneration, review console, audit report</td><td>의도적 결함 fixture의 탐지·복구 증명</td></tr>
+            <tr><td>16주</td><td>6. Hardening &amp; Release</td><td>security, privacy gate, performance, docs, versioned release bundle</td><td>release checklist와 운영 runbook 승인</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>Workstream별 책임</h3>
+        <div class="grid-3">
+          <div class="panel"><h3>Clinical &amp; Content</h3><ul><li>질환 module</li><li>기준값·불변식 검토</li><li>문서 양식·표현 검토</li><li>blind realism review</li></ul></div>
+          <div class="panel"><h3>Domain &amp; Backend</h3><ul><li>Chronicle kernel</li><li>event/claim persistence</li><li>projection API</li><li>job·provenance</li></ul></div>
+          <div class="panel"><h3>Data &amp; Validation</h3><ul><li>분포 target</li><li>joint sampler</li><li>cohort metrics</li><li>privacy evaluation</li></ul></div>
+          <div class="panel"><h3>LLM Platform</h3><ul><li>provider gateway</li><li>prompt contract</li><li>structured output</li><li>cost·replay</li></ul></div>
+          <div class="panel"><h3>Frontend &amp; Review</h3><ul><li>timeline</li><li>Claim conflict</li><li>cohort audit</li><li>document lineage</li></ul></div>
+          <div class="panel"><h3>QA &amp; Governance</h3><ul><li>test matrix</li><li>release gates</li><li>source/licensing</li><li>access audit</li></ul></div>
+        </div>
+
+        <h3>MVP 질환·상황 범위 제안</h3>
+        <ul>
+          <li>내과 3종: 비특이적 흉부 불편감, 발열·호흡기 감염, 복통.</li>
+          <li>외상 1종: 단순 사지 손상과 중증 외상 분기.</li>
+          <li>신경 1종: 의식 변화 또는 국소 신경학적 증상.</li>
+          <li>일상적 저중증 사례와 귀가·관찰 사례를 반드시 포함.</li>
+          <li>각 module은 routine, moderate, severe, ambiguous 경로를 갖되 빈도는 cohort target에서 결정.</li>
+        </ul>
+
+        <h3>Phase 1 파일 단위 백로그</h3>
+        <pre><code>schemas/
+  patient.schema.json
+  temporal_extent.schema.json
+  care_episode.schema.json
+  encounter.schema.json
+  chronicle_event.schema.json
+  claim.schema.json
+  evidence.schema.json
+  unknown.schema.json
+  observation.schema.json
+  intervention.schema.json
+  document_projection.schema.json
+  patient_blueprint.schema.json
+
+catalogs/
+  variable_catalog.yaml
+  concept_catalog.yaml
+  relation_types.yaml
+  unknown_types.yaml
+  association_catalog.yaml
+  reference_range_sets.yaml
+
+rules/
+  temporal_invariants.yaml
+  knowledge_frontier.yaml
+  open_closed_world.yaml
+  missingness_generation.yaml
+  projection_initial_note.yaml
+  projection_ambulance.yaml
+  projection_nedis_v4.yaml
+  ontology_extension.yaml</code></pre>
+
+        <h3>CMR 역량 등록</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>ID</th><th>역량</th><th>MVP 목표</th><th>Measured 단계 조건</th></tr></thead>
+          <tbody>
+            <tr><td>CMR-0001</td><td>Chronicle Kernel</td><td>Level 3 Defined</td><td>invariant metric·latency·error trend</td></tr>
+            <tr><td>CMR-0002</td><td>Knowledge-safe Projection</td><td>Level 3</td><td>leakage 0 gate와 자동 regression</td></tr>
+            <tr><td>CMR-0003</td><td>Cohort Fidelity</td><td>Level 3</td><td>metric dashboard와 tolerance versioning</td></tr>
+            <tr><td>CMR-0004</td><td>Unknown Registry</td><td>Level 2 Managed</td><td>반복 Unknown 자동 군집·승격 workflow</td></tr>
+            <tr><td>CMR-0005</td><td>NEDIS Adapter</td><td>Level 3</td><td>양식·코드 버전별 contract suite</td></tr>
+            <tr><td>CMR-0006</td><td>LLM Replay &amp; Repair</td><td>Level 3</td><td>모델별 실패율·cost·repair success</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="testing">
+        <h2>18. 테스트 전략과 완료 게이트</h2>
+        <h3>테스트 피라미드</h3>
+        <ul>
+          <li><strong>Unit:</strong> value object, 시간 계산, code mapping, sentinel encoding.</li>
+          <li><strong>Property-based:</strong> 임의 sequence에서도 시간 DAG, cardinality, supersede invariant 유지.</li>
+          <li><strong>Contract:</strong> JSON Schema, API, document profile, NEDIS tables.</li>
+          <li><strong>Golden patient:</strong> 임상 검토된 30–100개 Chronicle fixture.</li>
+          <li><strong>Metamorphic:</strong> 나이·성별·기관·시간대를 바꿨을 때 의도된 관계만 변하는지 확인.</li>
+          <li><strong>Cohort regression:</strong> 고정 seed 100·1,000·10,000명 분포와 metric snapshot.</li>
+          <li><strong>Mutation:</strong> 미래 정보, 시간 역전, sentinel 혼입, Claim 충돌을 주입해 validator 탐지.</li>
+          <li><strong>Human evaluation:</strong> 임상의·문서 실무자 blind review.</li>
+        </ul>
+
+        <h3>대표 acceptance fixtures</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Fixture</th><th>주입된 어려움</th><th>기대 결과</th></tr></thead>
+          <tbody>
+            <tr><td>routine-discharge</td><td>비특이 증상, 최소 검사, 귀가</td><td>극적 사건 추가 없이 완결</td></tr>
+            <tr><td>ems-treated-hypoxia</td><td>산소 후 SpO₂ 정상화</td><td>처치 전후와 산소 맥락 보존</td></tr>
+            <tr><td>conflicting-onset</td><td>환자·보호자 시각 불일치</td><td>Unknown과 복수 Claim 유지</td></tr>
+            <tr><td>future-diagnosis-leak</td><td>초진 문서에 최종 진단 삽입</td><td>knowledge gate에서 차단</td></tr>
+            <tr><td>missing-not-at-random</td><td>중증 환자 history 부족</td><td>not_asked/ unable_to_answer 생성</td></tr>
+            <tr><td>nedis-admission</td><td>ED→입원→퇴원</td><td>EMIHPTMI와 입원 관련 테이블 조건부 생성</td></tr>
+            <tr><td>clustered-heatwave</td><td>공유 ContextEvent</td><td>서로 다른 환자지만 군집 topology 보존</td></tr>
+            <tr><td>duplicate-blueprint</td><td>표현만 다른 동일 event graph</td><td>diversity validator 탐지</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>Release exit proof</h3>
+        <ul class="checklist">
+          <li>모든 schema migration이 빈 DB와 upgrade DB에서 성공한다.</li>
+          <li>critical invariant 및 knowledge leakage test가 100% 통과한다.</li>
+          <li>문서 field lineage coverage가 필수 필드 100%, 전체 필드 목표치 이상이다.</li>
+          <li>고정 benchmark cohort가 버전별 허용 tolerance를 통과한다.</li>
+          <li>의도적으로 주입한 결함 fixture를 validator가 탐지한다.</li>
+          <li>선택 재생성이 비영향 환자의 output hash를 바꾸지 않는다.</li>
+          <li>동일 manifest replay가 canonical structured output을 재현한다.</li>
+          <li>privacy·licensing·clinical governance sign-off가 artifact로 남는다.</li>
+          <li>운영 runbook, rollback, failed job recovery가 rehearsal을 통과한다.</li>
+        </ul>
+      </section>
+
+      <section id="risks">
+        <h2>19. 위험·맹점·결정 과제</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>위험</th><th>신호</th><th>완화</th><th>소유자</th></tr></thead>
+          <tbody>
+            <tr><td>모든 환자가 극적</td><td>extreme intensity 동시 상승</td><td>코호트 prior, intensity vector, routine quota가 아닌 stochastic target</td><td>Data</td></tr>
+            <tr><td>교과서적 진단 누출</td><td>초기 기록에 최종 단서 과다</td><td>forward simulator, knowledge frontier</td><td>Domain/QA</td></tr>
+            <tr><td>주변 분포만 일치</td><td>KTAS·입원 개별 비율은 맞지만 overlap 오류</td><td>joint·conditional metrics</td><td>Data</td></tr>
+            <tr><td>실제 기록보다 너무 깨끗함</td><td>결측·충돌·수정이 거의 없음</td><td>observation/documentation process 생성</td><td>Clinical/Data</td></tr>
+            <tr><td>시나리오 구조 mode collapse</td><td>문장만 다르고 event graph 반복</td><td>graph motif·blueprint hash audit</td><td>QA</td></tr>
+            <tr><td>의학 기준값 오용</td><td>연령·상황 무시한 고정 threshold</td><td>ReferenceRangeSet과 DecisionThreshold 분리</td><td>Clinical</td></tr>
+            <tr><td>NEDIS version drift</td><td>양식·코드 변경</td><td>adapter version, contract fixtures, migration</td><td>Integration</td></tr>
+            <tr><td>실데이터 유사성·재식별</td><td>near duplicate, 희귀 topology</td><td>privacy gate, 최소화, source environment 분리</td><td>Privacy</td></tr>
+            <tr><td>소아 persona 공백</td><td>성인 dataset를 소아에 재사용</td><td>별도 소아·보호자 population model</td><td>Data/Clinical</td></tr>
+            <tr><td>그래프 과설계</td><td>조회보다 ontology 운영 비용 증가</td><td>Postgres typed edge 우선, 병목 측정 후 graph DB</td><td>Architecture</td></tr>
+            <tr><td>LLM judge 편향</td><td>길고 극적인 기록을 선호</td><td>결정적 metric + blind human review</td><td>QA</td></tr>
+            <tr><td>법적 용도 혼동</td><td>합성 문서를 실제 차트로 사용</td><td>simulation watermark/metadata, human sign-off boundary</td><td>Governance</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>구현 전 확정해야 할 RFC</h3>
+        <ol>
+          <li><strong>RFC-001:</strong> 첫 release의 환자 범위—성인 응급실 우선인지 소아 포함인지.</li>
+          <li><strong>RFC-002:</strong> observational target의 기준 기관·연도·source data.</li>
+          <li><strong>RFC-003:</strong> 실제 record-level data 사용 여부와 privacy environment.</li>
+          <li><strong>RFC-004:</strong> Chronicle canonical vocabulary—내부 concept ID와 UMLS/KCD/SNOMED mapping 범위.</li>
+          <li><strong>RFC-005:</strong> 초진기록지의 기관 공통 core와 기관별 template 차이.</li>
+          <li><strong>RFC-006:</strong> 구급활동일지 적용 양식 version과 전자 서식 범위.</li>
+          <li><strong>RFC-007:</strong> NEDIS 4.0의 정확한 대상 연도·입력 지침·미전송 필드 처리.</li>
+          <li><strong>RFC-008:</strong> 임상 기준값·KTAS·질환 module의 승인 책임자와 갱신 주기.</li>
+          <li><strong>RFC-009:</strong> 허용 LLM provider, 데이터 반출 정책, 로컬 모델 기준.</li>
+          <li><strong>RFC-010:</strong> 합성 데이터 release의 품질·프라이버시 최소 gate.</li>
+        </ol>
+      </section>
+
+      <section id="appendix">
+        <h2>20. 부록</h2>
+
+        <h3>A. Core SQL DDL 예시</h3>
+        <pre><code>create table claim (
+  id uuid primary key,
+  schema_version text not null,
+  subject_type text not null,
+  subject_id uuid not null,
+  predicate text not null,
+  object_type text,
+  object_id uuid,
+  value_jsonb jsonb,
+  polarity text not null,
+  asserted_by_type text not null,
+  asserted_by_id uuid not null,
+  asserted_at timestamptz not null,
+  effective_earliest timestamptz,
+  effective_latest timestamptz,
+  certainty numeric check (certainty between 0 and 1),
+  status text not null,
+  generation_run_id uuid not null,
+  created_at timestamptz not null default now(),
+  check (effective_earliest is null or effective_latest is null
+         or effective_earliest &lt;= effective_latest)
+);
+
+create table unknown (
+  id uuid primary key,
+  target_type text not null,
+  target_id uuid not null,
+  variable_id text,
+  kind text not null,
+  introduced_at timestamptz not null,
+  candidate_values jsonb not null default '[]',
+  impact_jsonb jsonb not null default '{}',
+  status text not null,
+  resolved_by_claim_id uuid references claim(id),
+  generation_run_id uuid not null
+);
+
+create table relation_edge (
+  id uuid primary key,
+  relation_spec_id text not null,
+  source_type text not null,
+  source_id uuid not null,
+  target_type text not null,
+  target_id uuid not null,
+  effective_from timestamptz,
+  effective_to timestamptz,
+  confidence numeric check (confidence between 0 and 1),
+  attributes jsonb not null default '{}',
+  status text not null,
+  generation_run_id uuid not null
+);</code></pre>
+
+        <h3>B. Patient Blueprint 예시</h3>
+        <pre><code>{
+  "patient_id": "pat_01J...",
+  "cohort_run_id": "coh_01J...",
+  "target_stratum": "older_respiratory_moderate",
+  "selection_probability": 0.031,
+  "sample_weight": 1.0,
+  "baseline": {
+    "age_band": "70s",
+    "conditions": ["condition.copd", "condition.hypertension"],
+    "functional_status": "independent_with_limitations"
+  },
+  "episode": {
+    "primary_latent_process": "process.copd_exacerbation",
+    "competing_processes": ["process.pneumonia_possible"],
+    "acuity": "moderate",
+    "arrival_mode": "ambulance",
+    "expected_disposition_class": "admission"
+  },
+  "intensity_vector": {
+    "physiologic_severity": 2,
+    "diagnostic_ambiguity": 3,
+    "intervention_density": 2,
+    "outcome_extremity": 1,
+    "social_complexity": 0,
+    "rarity": 1
+  },
+  "missingness_profile": "limited_medication_history",
+  "documentation_profile": "busy_night_shift"
+}</code></pre>
+
+        <h3>C. 설계 추적성</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>요구</th><th>설계 구성요소</th><th>검증</th></tr></thead>
+          <tbody>
+            <tr><td>한 환자의 chronicle</td><td>Patient–Episode–Encounter–Event append-only model</td><td>golden timeline, replay hash</td></tr>
+            <tr><td>항목별 변수·기준값</td><td>VariableSpec + ReferenceRangeSet + DecisionThreshold</td><td>catalog schema, source/version audit</td></tr>
+            <tr><td>association이 큰 항목</td><td>AssociationSpec + conditional DAG</td><td>joint/conditional metric</td></tr>
+            <tr><td>Unknown unknown</td><td>Unknown Registry + ontology extension queue</td><td>out-of-ontology clustering</td></tr>
+            <tr><td>온톨로지·토폴로지</td><td>typed edge + relation spec + purpose-specific graphs</td><td>cardinality, cycle, motif tests</td></tr>
+            <tr><td>100명 모두 극적인 문제</td><td>Cohort-first plan + intensity vector + target ledger</td><td>intensity distribution audit</td></tr>
+            <tr><td>1차 후 2차 생성</td><td>Blueprint audit → Chronicle generation → selective repair</td><td>non-impact hash stability</td></tr>
+            <tr><td>초진·구급·NEDIS</td><td>knowledge-safe document adapters</td><td>field lineage, leakage, contract tests</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>D. 공식·연구 참고문헌</h3>
+        <ol class="source-list">
+          <li><a href="https://academic.oup.com/jamia/article/25/3/230/4098271">Synthea: An approach, method, and software mechanism for generating synthetic patients</a> — 개인·모집단 수준 검증 필요성.</li>
+          <li><a href="https://pubmed.ncbi.nlm.nih.gov/35389366/">Utility Metrics for Evaluating Synthetic Health Data Generation Methods</a> — 다변량 Hellinger 등 joint distribution 평가.</li>
+          <li><a href="https://pubmed.ncbi.nlm.nih.gov/42372998/">Evaluation of temporal preservation in synthetic longitudinal patient data</a> — 주변·공분산·개인 궤적·측정 구조의 다차원 평가.</li>
+          <li><a href="https://hl7.org/fhir/R5/">HL7 FHIR R5</a> 및 <a href="https://hl7.org/fhir/R5/provenance-definitions.html">FHIR Provenance</a> — Patient, Encounter, Observation, Provenance 정렬 참고.</li>
+          <li><a href="https://ohdsi.github.io/CommonDataModel/">OHDSI OMOP CDM v5.4</a> — 분석용 common data model export 참고.</li>
+          <li><a href="https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=285327">의료법 제22조·제23조</a> — 진료기록 작성·보존·전자의무기록 관련 법령 확인 지점.</li>
+          <li><a href="https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=283869">의료법 시행규칙</a> — 진료기록부 기재 사항·보존 등 양식 정책 확인 지점.</li>
+          <li><a href="https://www.law.go.kr/LSW/lsLawLinkInfo.do?chrClsCd=010202&amp;lsJoLnkSeq=1000995617">119구조·구급에 관한 법률 시행규칙 제18조</a> 및 <a href="https://www.law.go.kr/flDownload.do?flNm=%5B%EB%B3%84%EC%A7%80+%EC%A0%9C5%ED%98%B8%EC%84%9C%EC%8B%9D%5D+%EA%B5%AC%EA%B8%89%ED%99%9C%EB%8F%99%EC%9D%BC%EC%A7%80%0A&amp;flSeq=30739678">별지 제5호 구급활동일지</a>.</li>
+          <li><a href="https://law.go.kr/lsInfoP.do?lsId=011357">개인정보 보호법</a> — 실제 데이터 사용 시 별도 법무·개인정보 검토 필요.</li>
+        </ol>
+
+        <h3>E. 로컬 조사 자료</h3>
+        <ul class="source-list">
+          <li><code>../claude-patient-scenario-generator-skill</code> — 3단 시나리오 생성 스키마·프롬프트·validator.</li>
+          <li><code>../medical-record-generator</code> — 독립 문서 생성과 consistency pass 구조.</li>
+          <li><code>../korean-persona</code> — Nemotron-Personas-Korea 성인 페르소나 스키마와 라이선스.</li>
+          <li><code>../nedis-synthetic-data</code> — NEDIS 4.0 core schema·변수 mapping·합성·검증 파이프라인.</li>
+          <li><code>../icaretok</code> 및 iCloud의 <code>icaretok-모의환자-시뮬레이션-20260714.md</code> — 결정론적 문진 경로 검증과 생성형 시나리오의 분리.</li>
+        </ul>
+
+        <div class="callout warn"><strong>문서 상태:</strong> 본 문서는 구현 기준선이다. 특정 임상 기준값, KTAS 규칙, NEDIS 코드, 법적 보존·서명 요건은 production 적용 전 최신 공식 자료와 담당 전문가의 승인을 받아 version bundle로 고정해야 한다.</div>
+      </section>
+
+      <footer class="page-footer">
+        <p><strong>Patient Chronicle Generator 통합 설계서 v1.0</strong><br>작성일 2026-07-14 · 단일 HTML · 외부 스타일·스크립트 의존성 없음</p>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

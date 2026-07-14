@@ -1,0 +1,12 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema","title":"PatientChronicle","type":"object","required":["patient_id","synthetic","demographics","timeline","problems","observations","encounters","provenance"],
+  "properties":{
+    "patient_id":{"type":"string"},"synthetic":{"type":"boolean"},"generated_by":{"type":"string"},
+    "demographics":{"type":"object","required":["sex","age","residence"],"properties":{"sex":{"type":"string"},"age":{"type":"integer","minimum":0,"maximum":120},"residence":{"type":"string"},"occupation":{"type":"string"}}},
+    "timeline":{"type":"array","items":{"type":"object","required":["date","event","source"],"properties":{"date":{"type":"string"},"event":{"type":"string"},"source":{"type":"string"},"details":{"type":"string"}}}},
+    "problems":{"type":"array","items":{"type":"object","required":["code","label","status"],"properties":{"code":{"type":"string"},"label":{"type":"string"},"status":{"type":"string"}}}},
+    "observations":{"type":"array","items":{"type":"object","required":["name","value","date"],"properties":{"name":{"type":"string"},"value":{},"unit":{"type":"string"},"date":{"type":"string"}}}},
+    "encounters":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string"},"date":{"type":"string"},"record":{"type":"string"}}}},
+    "provenance":{"type":"object","properties":{"consent":{"type":"string"},"version":{"type":"string"}}}
+  }
+}
