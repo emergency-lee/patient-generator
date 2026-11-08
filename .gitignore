@@ -1,3 +1,7 @@
 __pycache__/
 *.pyc
 .codex-llm/logs/
+
+# Local AI agent configuration and state
+.claude/
+.codex/
